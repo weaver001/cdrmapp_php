@@ -23,11 +23,20 @@ class MediaController extends Controller
     {
         Gate::authorize('admin');
         abort_unless($content->type === $type, 404);
-        $path = $this->image($r)->storePublicly('content', 'public');
+        $disk = config('filesystems.cms_disk');
+        // R2 / Laravel Cloud uses bucket visibility and rejects public ACLs.
+        $path = $this->image($r)->store('content', $disk);
+        abort_unless($path, 503, 'Image storage is unavailable. Please retry.');
         $old = $content->image_path;
-        $content->update(['image_path' => $path]);
+        $oldDisk = $content->image_disk ?: 'public';
+        try {
+            $content->update(['image_path' => $path, 'image_disk' => $disk]);
+        } catch (\Throwable $e) {
+            Storage::disk($disk)->delete($path);
+            throw $e;
+        }
         if ($old) {
-            Storage::disk('public')->delete($old);
+            Storage::disk($oldDisk)->delete($old);
         }
 
         return ['data' => $content];

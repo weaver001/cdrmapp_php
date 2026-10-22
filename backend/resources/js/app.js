@@ -152,7 +152,7 @@ if (management) {
             last = result.meta?.last_page || result.last_page || 1; document.querySelector('#manage-page').textContent = `Page ${page} of ${last}`; document.querySelector('#manage-prev').disabled = page <= 1; document.querySelector('#manage-next').disabled = page >= last;
         } catch (e) { message.textContent = e.message; }
     }
-    editor?.addEventListener('submit', async e => { e.preventDefault(); const id = editor.elements.id.value; try { const result = await api(editor.dataset.endpoint + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', formBody(editor)); if (content && editor.elements.image?.files[0]) await upload(`${editor.dataset.endpoint}/${result.data.id}/image`,editor.elements.image.files[0]);message.textContent='Saved.';await load(); } catch(error) {message.textContent=error.message;} });
+    editor?.addEventListener('submit', async e => { e.preventDefault(); const id = editor.elements.id.value; try { const result = await api(editor.dataset.endpoint + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', formBody(editor)); if (content) editor.elements.id.value = result.data.id; if (content && editor.elements.image?.files[0]) await upload(`${editor.dataset.endpoint}/${result.data.id}/image`,editor.elements.image.files[0]);message.textContent='Saved.';await load(); } catch(error) {message.textContent=error.message;} });
     editor?.addEventListener('reset', () => { setTimeout(() => { editor.elements.id.value = ''; }, 0); });
     document.querySelector('#trash')?.addEventListener('change', () => { page = 1; load(); });
     document.querySelector('#manage-prev').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#manage-next').onclick = () => { if (page < last) { page++; load(); } }; load();
