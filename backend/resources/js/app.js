@@ -8,10 +8,17 @@ export async function api(path, method = 'GET', body) {
     return response.json();
 }
 async function upload(path, file) {
- const body = new FormData(); body.append('image', file);
- const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body });
- if (!response.ok) { const result = await response.json(); throw new Error(Object.values(result.error?.fields || {}).flat().join(' ') || result.error?.message || 'Upload failed.'); }
- return response.json();
+    const body = new FormData(); body.append('image', file);
+    let response;
+    try {
+        response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body, signal: AbortSignal.timeout(60000) });
+    } catch (error) {
+        throw new Error(error.name === 'TimeoutError' ? 'Image upload timed out. Check the saved image before retrying.' : 'Image upload could not connect. Check your connection and retry.');
+    }
+    const result = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(Object.values(result?.error?.fields || {}).flat().join(' ') || result?.error?.message || `Image upload failed (HTTP ${response.status}).`);
+    if (!result) throw new Error('Image upload returned an unexpected response. Refresh the page and sign in again if needed.');
+    return result;
 }
 document.querySelector('#photo-form')?.addEventListener('submit', async e => { e.preventDefault();const message = document.querySelector('#form-status');try {await upload('/api/v1/me/photo',e.target.elements.image.files[0]);message.textContent='Profile image updated.';}catch(error){message.textContent=error.message;} });
 const node = (tag, text, className) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (className) n.className = className; return n; };
@@ -141,7 +148,16 @@ if (management) {
                     if (item.deleted_at) card.append(button('Permanently delete', () => { if (confirm('Permanently delete this contact message?')) mutate(`${endpoint}/${item.id}/destroy`, 'POST', { confirm: true }); }));
                 } else {
                     card.append(node('p', content ? item.body : `${item.email} · ${item.role} · ${item.active ? 'Active' : 'Inactive'}`, 'my-3 whitespace-pre-line'));
-                    if (content) card.append(node('p', item.published ? 'Published' : 'Draft', 'text-sm mb-3'));
+                    if (content) {
+                        card.append(node('p', item.published ? 'Published' : 'Draft', 'text-sm mb-3'));
+                        if (item.image_url) {
+                            const image = node('img', null, 'rounded-lg mb-3 max-h-48'); image.src = item.image_url; image.alt = 'Saved image';
+                            const imageStatus = node('p', 'Loading saved image…', 'text-sm mb-3');
+                            image.addEventListener('load', () => { imageStatus.textContent = 'Saved image loaded.'; });
+                            image.addEventListener('error', () => { imageStatus.textContent = 'The saved image could not load. Select the image again and save.'; });
+                            card.append(image, imageStatus);
+                        } else card.append(node('p', 'No image attached.', 'text-sm mb-3'));
+                    }
                     card.append(button('Edit', () => { for (const field of editor.elements) { if (!field.name || field.type === 'file') continue; if (field.type === 'checkbox') field.checked = !!item[field.name]; else field.value = field.name.startsWith('details.') ? (item.details?.[field.name.slice(8)] ?? '') : (item[field.name] ?? ''); } editor.scrollIntoView({ behavior: 'smooth' }); }));
                     if (content) card.append(button('Remove', () => { if (confirm('Remove this item from publication?')) mutate(`${endpoint}/${item.id}`, 'DELETE'); }));
                     else if(module==='users') card.append(button('Send password reset', () => mutate(`${endpoint}/${item.id}/reset-password`, 'POST', {})));
@@ -152,7 +168,40 @@ if (management) {
             last = result.meta?.last_page || result.last_page || 1; document.querySelector('#manage-page').textContent = `Page ${page} of ${last}`; document.querySelector('#manage-prev').disabled = page <= 1; document.querySelector('#manage-next').disabled = page >= last;
         } catch (e) { message.textContent = e.message; }
     }
-    editor?.addEventListener('submit', async e => { e.preventDefault(); const id = editor.elements.id.value; try { const result = await api(editor.dataset.endpoint + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', formBody(editor)); if (content) editor.elements.id.value = result.data.id; if (content && editor.elements.image?.files[0]) await upload(`${editor.dataset.endpoint}/${result.data.id}/image`,editor.elements.image.files[0]);message.textContent='Saved.';await load(); } catch(error) {message.textContent=error.message;} });
+    let saving = false;
+    editor?.addEventListener('invalid', () => { message.textContent = 'Complete the highlighted fields before saving.'; }, true);
+    editor?.addEventListener('submit', async e => {
+        e.preventDefault();
+        if (saving) return;
+        const id = editor.elements.id.value;
+        const file = content ? editor.elements.namedItem('image')?.files?.[0] : null;
+        const body = formBody(editor);
+        const fields = [...editor.elements].map(field => [field, field.disabled]);
+        let contentSaved = false;
+        saving = true;
+        fields.forEach(([field]) => { field.disabled = true; });
+        message.textContent = 'Saving content…';
+        try {
+            const result = await api(editor.dataset.endpoint + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', body);
+            if (content) {
+                editor.elements.id.value = result.data.id;
+                contentSaved = true;
+            }
+            if (file) {
+                message.textContent = 'Content saved. Uploading image…';
+                const uploaded = await upload(`${editor.dataset.endpoint}/${result.data.id}/image`, file);
+                if (!uploaded.data?.image_path || !uploaded.data?.image_url) throw new Error('The server did not confirm a saved image. Please retry the image upload.');
+                editor.elements.namedItem('image').value = '';
+            }
+            message.textContent = file ? 'Content and image saved.' : content ? 'Content saved. No new image was selected.' : 'Saved.';
+            await load();
+        } catch (error) {
+            message.textContent = contentSaved ? `Content saved, but image upload failed: ${error.message}` : error.message;
+        } finally {
+            saving = false;
+            fields.forEach(([field, disabled]) => { field.disabled = disabled; });
+        }
+    });
     editor?.addEventListener('reset', () => { setTimeout(() => { editor.elements.id.value = ''; }, 0); });
     document.querySelector('#trash')?.addEventListener('change', () => { page = 1; load(); });
     document.querySelector('#manage-prev').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#manage-next').onclick = () => { if (page < last) { page++; load(); } }; load();

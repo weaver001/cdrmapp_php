@@ -24,6 +24,8 @@ Announcement, infographic, service, and team images can use a private Laravel Cl
 
 Old uploads retain their original `public` disk location; setting `CMS_MEDIA_DISK` does not move them. If they still exist, back them up before redeploying and re-upload through Admin. Missing files on ephemeral servers cannot be recovered by this change. `storage:link` is only needed for local/public disk images and does not provide persistent cloud storage.
 
+If saving an announcement produces no visible result, check the Admin status above the form. It now reports required-field validation, saving, uploading, and upload failures separately. A successful image upload reports **Content and image saved.** The record card shows the saved image or **No image attached.** A timeout does not prove that the server stopped processing: refresh and check the saved image before retrying. If a saved image fails to load, inspect its image request's HTTP status; if no image is attached, inspect the POST request ending in `/image`. Share only status codes and error messages, not credentials, cookies, or signed URLs. The isolated browser regression check is `node infra/cms-media-smoke.cjs`; it intercepts HTTP requests and does not connect to a real bucket.
+
 This configuration covers CMS images only. Profile photos and incident evidence still explicitly use the private **local** disk and need a separate persistent private-storage implementation before relying on their durability in production. Never place evidence in a public bucket.
 
 The tests validate disk selection, replacement, failed writes, publication filtering, page/API URLs, and the real S3 adapter's URL signing locally. A live Laravel Cloud bucket is not provisioned or verified by these tests.
