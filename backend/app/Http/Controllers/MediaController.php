@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Content;
 use App\Models\Incident;
 use App\Models\IncidentAttachment;
@@ -30,7 +31,11 @@ class MediaController extends Controller
         $old = $content->image_path;
         $oldDisk = $content->image_disk ?: 'public';
         try {
-            $content->update(['image_path' => $path, 'image_disk' => $disk]);
+            DB::transaction(function () use ($r, $content, $path, $disk) {
+                $before = $content->only(['image_path', 'image_disk']);
+                $content->update(['image_path' => $path, 'image_disk' => $disk]);
+                AuditLog::recordChange($r->user(), 'content.image_updated', $content, $before, $content->only(['image_path', 'image_disk']));
+            });
         } catch (\Throwable $e) {
             Storage::disk($disk)->delete($path);
             throw $e;

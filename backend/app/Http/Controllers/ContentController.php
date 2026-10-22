@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Services\RichText;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class ContentController extends Controller
@@ -54,8 +55,12 @@ class ContentController extends Controller
         $d['body'] = app(RichText::class)->sanitize($d['body']);
         $d['type'] = $type;
         $content ??= new Content;
-        $content->fill($d)->save();
-        $this->audit($r, 'content.saved', $content->id);
+        DB::transaction(function () use ($content, $d, $r) {
+            $new = ! $content->exists;
+            $before = $new ? [] : $this->snapshot($content);
+            $content->fill($d)->save();
+            AuditLog::recordChange($r->user(), $new ? 'content.created' : 'content.updated', $content, $before, $this->snapshot($content));
+        });
 
         return ['data' => $content];
     }
@@ -64,8 +69,11 @@ class ContentController extends Controller
     {
         Gate::authorize('admin');
         abort_unless($content->type === $type, 404);
-        $content->delete();
-        $this->audit($r, 'content.deleted', $content->id);
+        DB::transaction(function () use ($content, $r) {
+            $before = $this->snapshot($content);
+            $content->delete();
+            AuditLog::recordChange($r->user(), 'content.deleted', $content, $before, []);
+        });
 
         return ['data' => ['message' => 'Moved to trash.']];
     }
@@ -88,23 +96,27 @@ class ContentController extends Controller
     {
         Gate::authorize('admin');
         $m = ContactMessage::withTrashed()->findOrFail($id);
-        if ($action === 'trash') {
-            $m->delete();
-        } elseif ($action === 'restore') {
-            $m->restore();
-        } elseif ($action === 'destroy') {
-            $r->validate(['confirm' => 'required|accepted']);
-            abort_unless($m->trashed(), 422, 'Move to trash first.');
-            $m->forceDelete();
-        } else {
-            abort(404);
-        }$this->audit($r, 'message.'.$action, $id);
+        $before = $m->only(['name', 'email', 'message', 'deleted_at']);
+        DB::transaction(function () use ($r, $m, $action, $before) {
+            if ($action === 'trash') {
+                $m->delete();
+            } elseif ($action === 'restore') {
+                $m->restore();
+            } elseif ($action === 'destroy') {
+                $r->validate(['confirm' => 'required|accepted']);
+                abort_unless($m->trashed(), 422, 'Move to trash first.');
+                $m->forceDelete();
+            } else {
+                abort(404);
+            }
+            AuditLog::recordChange($r->user(), 'message.'.$action, $m, $before, $action === 'destroy' ? [] : $m->only(['name', 'email', 'message', 'deleted_at']), 'Message from '.$m->name);
+        });
 
         return ['data' => ['message' => 'Message updated.']];
     }
 
-    private function audit(Request $r, string $action, int $id): void
+    private function snapshot(Content $content): array
     {
-        AuditLog::create(['actor_id' => $r->user()->id, 'action' => $action, 'record_type' => 'content', 'record_id' => $id]);
+        return $content->only(['type', 'title', 'body', 'published', 'details']);
     }
 }

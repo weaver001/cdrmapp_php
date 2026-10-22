@@ -3,7 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Agency;
-use App\Models\DispatchRule;
+use App\Models\AgencyDispatchRoute;
+use App\Models\AuditLog;
 use App\Models\Incident;
 use App\Models\IncidentCategory;
 use App\Models\User;
@@ -29,7 +30,7 @@ class IncidentWorkflowTest extends TestCase
         $a = Agency::firstOrCreate(['type' => $type], ['name' => $type]);
 
         $category = IncidentCategory::firstOrCreate(['name' => $type], ['agency_id' => $a->id]);
-        DispatchRule::firstOrCreate(['category_id' => $category->id, 'agency_id' => $a->id], ['name' => 'SYNTHETIC TEST jurisdiction', 'south' => 14, 'north' => 15, 'west' => 120, 'east' => 122, 'active' => true]);
+        AgencyDispatchRoute::updateOrCreate(['agency_id' => $a->id], ['active' => true]);
 
         return $category;
     }
@@ -47,6 +48,9 @@ class IncidentWorkflowTest extends TestCase
         $first = $this->postJson('/api/v1/incidents', $d)->assertCreated()->assertJsonPath('data.workflow_status', 'submitted')->json('data');
         $this->postJson('/api/v1/incidents', $d)->assertOk()->assertJsonPath('data.id', $first['id']);
         $this->assertDatabaseCount('incidents', 1);
+        $audit = AuditLog::where('action', 'incident.created')->sole();
+        $this->assertSame($citizen->name, $audit->actor_name);
+        $this->assertSame($first['public_reference'], $audit->record_label);
         $this->getJson('/api/v1/incidents/receipt/'.$d['idempotency_key'])->assertOk()->assertJsonPath('data.id', $first['id']);
         $this->postJson('/api/v1/incidents', array_replace($d, ['description' => 'Different description']))->assertConflict();
         $other = $this->user();

@@ -68,10 +68,17 @@ const html = `<meta name="csrf-token" content="synthetic">
         releaseSave();
         await page.getByText('Content saved. Uploading image…', { exact: true }).waitFor();
         releaseUpload();
-        await page.getByText('Content and image saved.', { exact: true }).waitFor();
+        await page.getByText('Content and image saved successfully.', { exact: true }).waitFor();
         await page.getByText('Saved image loaded.', { exact: true }).waitFor();
         assert.equal(writes.filter(request => request.path.endsWith('/image')).length, 1);
         assert.equal(await page.locator('input[type=file]').inputValue(), '');
+
+        assert.equal(await page.locator('input[name=id]').inputValue(), '');
+        assert.equal(await page.locator('[name=title]').inputValue(), '');
+        assert.equal(await page.locator('[name=body]').inputValue(), '');
+        await page.locator('[name=title]').fill('Synthetic retry notice');
+        await page.locator('[name=body]').fill('Keep this description on upload failure.');
+        await page.locator('input[name=id]').evaluate(input => { input.value = '123'; });
 
         for (const [failure, expected] of [
             ['storage-failure', 'Image storage is unavailable. Please retry.'],
@@ -85,13 +92,17 @@ const html = `<meta name="csrf-token" content="synthetic">
             assert.equal(await save.isDisabled(), false);
             assert.equal(await page.locator('input[name=id]').inputValue(), '123');
             assert.ok(await page.locator('input[type=file]').inputValue(), 'Keep the image selected for retry.');
+            assert.equal(await page.locator('[name=title]').inputValue(), 'Synthetic retry notice');
         }
         mode = 'success';
         await save.click();
-        await page.getByText('Content and image saved.', { exact: true }).waitFor();
+        await page.getByText('Content and image saved successfully.', { exact: true }).waitFor();
         assert.equal(writes.filter(request => request.method === 'POST' && !request.path.endsWith('/image')).length, 1, 'Retries must update the same announcement.');
+        await page.locator('[name=title]').fill('Synthetic text notice');
+        await page.locator('[name=body]').fill('No image selected.');
         await save.click();
-        await page.getByText('Content saved. No new image was selected.', { exact: true }).waitFor();
+        await page.getByText('Content saved successfully.', { exact: true }).waitFor();
+        assert.equal(await page.locator('[name=title]').inputValue(), '');
         assert.deepEqual(errors, []);
         console.log('PASS: validation feedback, save/upload progress, selected file submission, preview, storage/HTTP/unconfirmed failures, retry without duplicate announcements, and no-image feedback.');
     } finally {

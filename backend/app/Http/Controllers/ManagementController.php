@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agency;
+use App\Models\AgencyDispatchRoute;
 use App\Models\AuditLog;
 use App\Models\DeviceToken;
-use App\Models\DispatchRule;
 use App\Models\IncidentCategory;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -22,16 +22,24 @@ class ManagementController extends Controller
     {
         Gate::authorize('admin');
 
-        return JsonResource::collection(DispatchRule::latest()->paginate(25));
+        return JsonResource::collection(AgencyDispatchRoute::with('agency')->orderBy('id')->paginate(25));
     }
 
-    public function saveDispatch(Request $r, ?DispatchRule $rule = null)
+    public function saveDispatch(Request $r, ?AgencyDispatchRoute $rule = null)
     {
         Gate::authorize('admin');
-        $d = $r->validate(['name' => 'required|string|max:180', 'category_id' => 'required|integer|exists:incident_categories,id', 'agency_id' => 'required|integer|exists:agencies,id', 'south' => 'required|numeric|between:-90,90', 'north' => 'required|numeric|between:-90,90|gt:south', 'west' => 'required|numeric|between:-180,180', 'east' => 'required|numeric|between:-180,180|gt:west', 'active' => 'required|boolean']);
-        $rule ??= new DispatchRule;
-        $rule->fill($d)->save();
-        AuditLog::create(['actor_id' => $r->user()->id, 'action' => 'dispatch.saved', 'record_type' => 'dispatch_rule', 'record_id' => $rule->id, 'metadata' => $d]);
+        $d = $r->validate(['agency_id' => ['required', 'integer', Rule::exists('agencies', 'id')->whereIn('type', array_keys(Agency::DEFAULT_NAMES))], 'active' => 'required|boolean']);
+        $d['agency_id'] = (int) $d['agency_id'];
+        abort_if($rule?->exists && $rule->agency_id !== $d['agency_id'], 422, 'Edit the routing setting for the selected agency.');
+        $rule = DB::transaction(function () use ($d, $r) {
+            $rule = AgencyDispatchRoute::firstOrNew(['agency_id' => $d['agency_id']]);
+            $new = ! $rule->exists;
+            $before = $rule->exists ? $rule->only(['active']) : [];
+            $rule->fill($d)->save();
+            AuditLog::recordChange($r->user(), $new ? 'dispatch.created' : 'dispatch.updated', $rule, $before, $rule->only(['active']), $rule->agency->name);
+
+            return $rule;
+        });
 
         return ['data' => $rule];
     }
@@ -75,7 +83,8 @@ class ManagementController extends Controller
         $user ??= new User;
         $emailChanged = $user->exists && $user->email !== $d['email'];
         $d['agency_id'] = $d['role'] === 'officer' ? $d['agency_id'] : null;
-        DB::transaction(function () use ($user, $d, $new, $emailChanged, $r) {
+        $before = $new ? [] : $this->userSnapshot($user);
+        DB::transaction(function () use ($user, $d, $new, $emailChanged, $r, $before) {
             $user->forceFill($d);
             if ($new) {
                 $user->password = Str::random(64);
@@ -83,13 +92,20 @@ class ManagementController extends Controller
                 $user->email_verified_at = null;
             }$user->save();
             $user->tokens()->delete();
-            AuditLog::create(['actor_id' => $r->user()->id, 'action' => 'user.saved', 'record_type' => 'user', 'record_id' => $user->id, 'metadata' => ['role' => $user->role, 'active' => $user->active, 'agency_id' => $user->agency_id]]);
+            AuditLog::recordChange($r->user(), $new ? 'user.created' : 'user.updated', $user, $before, $this->userSnapshot($user));
         });
+        $message = $new ? 'Account created successfully.' : 'Account updated successfully.';
         if ($new || $emailChanged) {
-            Password::sendResetLink(['email' => $user->email]);
+            try {
+                $status = Password::sendResetLink(['email' => $user->email]);
+                $message .= $status === Password::RESET_LINK_SENT ? ' Password invitation sent.' : ' Password invitation was not sent; use Send password reset to retry.';
+            } catch (\Throwable $e) {
+                report($e);
+                $message .= ' Password invitation could not be sent. Check email settings and use Send password reset to retry.';
+            }
         }
 
-        return ['data' => $user];
+        return ['data' => $user, 'message' => $message];
     }
 
     public function resetUser(User $user)
@@ -104,7 +120,11 @@ class ManagementController extends Controller
     {
         Gate::authorize('admin');
         $d = $r->validate(['name' => 'required|string|max:180', 'jurisdiction' => 'nullable|string|max:2000', 'emergency_phone' => 'nullable|string|max:50', 'active' => 'required|boolean']);
-        $agency->update($d);
+        DB::transaction(function () use ($r, $agency, $d) {
+            $before = $agency->only(['name', 'jurisdiction', 'emergency_phone', 'active']);
+            $agency->update($d);
+            AuditLog::recordChange($r->user(), 'agency.updated', $agency, $before, $agency->only(['name', 'jurisdiction', 'emergency_phone', 'active']));
+        });
 
         return ['data' => $agency];
     }
@@ -142,6 +162,13 @@ class ManagementController extends Controller
     {
         Gate::authorize('admin');
 
-        return JsonResource::collection(AuditLog::latest()->paginate(50));
+        return JsonResource::collection(AuditLog::with('actor:id,name,email')->latest('id')->paginate(50));
+    }
+
+    private function userSnapshot(User $user): array
+    {
+        return $user->only(['name', 'email', 'role', 'active', 'agency_id']) + [
+            'agency_name' => $user->agency_id ? Agency::find($user->agency_id)?->name : null,
+        ];
     }
 }

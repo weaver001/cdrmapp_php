@@ -29,7 +29,7 @@ class IncidentWorkflow
         }
         $i->save();
         IncidentStatusHistory::create(['incident_id' => $i->id, 'actor_id' => $actor->id, 'old_status' => $old, 'new_status' => $next, 'note' => $note]);
-        AuditLog::create(['actor_id' => $actor->id, 'action' => 'incident.status', 'record_type' => 'incident', 'record_id' => $i->id, 'metadata' => ['from' => $old, 'to' => $next]]);
+        AuditLog::recordChange($actor, 'incident.status', $i, ['status' => $old], ['status' => $next], $i->public_reference);
         $this->notify($i);
     }
 

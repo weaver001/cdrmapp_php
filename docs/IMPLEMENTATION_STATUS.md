@@ -6,7 +6,7 @@ The supplied master specification is the implementation specification; the DOCX 
 |---|---|---|
 | 1 Requirements | Master preserved, source text extracted, source screenshots inspected for branding, requirement and figure traceability, assumptions, architecture and ERD | Operational/legal decisions require confirmation |
 | 2 Shared foundation | Laravel 12, PHP 8.4, MySQL 8.4, Compose web/DB/worker/mail, migrations, seeders, roles, Sanctum, sessions, verification, password reset, profile, deactivation | Fine-grained editable permission model and multi-agency assignments not implemented |
-| 3 Incident API | Transactional submission, per-user idempotency, request conflict detection, fresh GPS/manual location validation, explicit rectangle dispatch rules and triage, scoped lists/details, assignment/rerouting, responses, verification, lifecycle/history/audit, private evidence | Polygon jurisdiction rules, broader audit coverage and operational escalation policy |
+| 3 Incident API | Transactional submission, per-user idempotency, request conflict detection, fresh GPS/manual location validation, agency-based automatic routing and triage, scoped lists/details, assignment/rerouting, responses, verification, lifecycle/history/audit, private evidence | Polygon jurisdiction rules, broader audit coverage and operational escalation policy |
 | 4 Staff web | Responsive green dashboard, agency scope, 15-second targeted polling paused when hidden, lists/filters/pagination, details, response notes, status controls, assignment, rerouting, unread notification handling, CSV and current-page printing | Full report-layout customization and server-generated PDF; advanced trend visualizations |
 | 5 Maps/DSS | Google Maps JS + supported deck.gl overlay code, authorized aggregate grid, validation/test/rejection/duplicate/accuracy exclusion, threshold suppression, filters and cell cap, cache version invalidation | No key: live map/overlay rendering unverified. Bounds supported by API; automatic viewport-driven queries and polygon hotspots remain incomplete |
 | 6 CMS/public | CRUD/publishing for six typed content modules, sanitized rich text, image uploads, public pages, manual infographic carousel, contact map configuration, contact inbox/trash/restore/delete, account and dispatch management | Rich-text WYSIWYG editor, CMS content restoration UI, advanced search/export layouts |
@@ -31,7 +31,7 @@ The supplied master specification is the implementation specification; the DOCX 
 
 ## External configuration
 
-All Google Maps/Firebase variable names were checked; required project values are absent. Live Maps, FCM, production mail, Android signing and deployment are not validated. Confirm actual jurisdiction boundaries and official emergency numbers before setting dispatch rules/contact configuration. Unconfigured or ambiguous routing goes to human triage.
+All Google Maps/Firebase variable names were checked; required project values are absent. Live Maps, FCM, production mail, Android signing and deployment are not validated. Confirm official emergency numbers before setting contact configuration. New reports route to the category’s linked active agency when its routing setting is enabled; disabled or unavailable routing goes to human triage.
 
 ## Resume commands
 
@@ -56,3 +56,14 @@ The install_script and start_skill are saved, along with Google Maps/Firebase co
 The shared catalog now presents Fire Department (BFP), Police Department (PNP), and MDRRMO in that order. Existing databases are upgraded by 2026_10_22_000003_standardize_default_agencies without changing agency/category IDs or historical references. Existing activation flags, contact configuration and custom categories are preserved. Seeder reruns do not duplicate the defaults. Web filters/account management and Android reporting read the same catalog. Map markers and CSV exports include full agency names. Initial web and Android map views now center on San Jose del Monte, Bulacan; this does not change dispatch jurisdiction.
 
 Both backend database suites passed 17 tests and 136 assertions for this update. The updated code must be deployed and `php artisan migrate --force` run in Laravel Cloud to update production records.
+
+
+## Admin workflow update
+
+Account and content forms show success and reset after a complete successful save, including selected image uploads. Validation or image-upload failures preserve entered values and the saved content ID for retry. Clear Field resets the form; selects return to their placeholder and activation checkboxes return to their initial defaults. An email-delivery failure after account creation returns a clear account-created message with an invitation warning rather than reporting that account creation failed.
+
+Agency dispatch replaces category/coordinate rectangle editing. Migration `2026_10_22_000005_create_agency_dispatch_routes` enables one route each for BFP, PNP, and MDRRMO. New reports use the selected incident category's linked agency regardless of coordinates. Disabled routes, inactive agencies/categories, and missing mappings require triage. Existing reports keep their agency assignments; legacy rectangle records remain stored but no longer affect dispatch. Admins may enable or disable each agency's automatic routing.
+
+New audit events snapshot the actor's name and email, the affected account/content/agency label, and allowlisted before/after fields. Content and contact-message removal remain identifiable after deletion. Image replacement, agency edits and routing edits are also logged. The audit page displays names and changes rather than numeric actors and raw JSON. Existing audit entries are preserved; unavailable historical titles or actor snapshots cannot be reconstructed retroactively. Passwords, reset tokens and signed image URLs are excluded from new snapshots.
+
+Validation: backend feature tests cover routing, permissions, audit persistence, form rendering and invitation failure. `node infra/cms-media-smoke.cjs` and `node infra/admin-management-smoke.cjs` exercise browser save/reset behavior with intercepted HTTP; they do not provision a production bucket or send email.

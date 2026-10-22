@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\IncidentResource;
+use App\Models\Agency;
 use App\Models\AuditLog;
 use App\Models\Incident;
 use App\Models\IncidentCategory;
@@ -60,9 +61,10 @@ class IncidentController extends Controller
         try {
             $i = DB::transaction(function () use ($r, $d, $hash, $flow) {
                 $cat = IncidentCategory::findOrFail($d['category_id']);
-                $agencyId = app(Dispatch::class)->agency($cat->id, (float) $d['latitude'], (float) $d['longitude']);
+                $agencyId = app(Dispatch::class)->agency($cat->id);
                 $i = Incident::create($d + ['reporter_id' => $r->user()->id, 'agency_id' => $agencyId, 'public_reference' => (string) Str::uuid(), 'received_at' => now(), 'request_hash' => $hash]);
                 IncidentStatusHistory::create(['incident_id' => $i->id, 'actor_id' => $r->user()->id, 'new_status' => 'submitted', 'note' => 'Durably received by the server.']);
+                AuditLog::recordChange($r->user(), 'incident.created', $i, [], $i->only(['category_id', 'agency_id', 'workflow_status']), $i->public_reference);
                 $flow->notify($i);
 
                 return $i;
@@ -135,7 +137,7 @@ class IncidentController extends Controller
         DB::transaction(function () use ($r, $incident, $d) {
             $i = Incident::lockForUpdate()->findOrFail($incident->id);
             Gate::authorize('update', $i);
-            $old = $i->agency_id;
+            $before = ['agency' => Agency::find($i->agency_id)?->name, 'assigned_officer' => User::find($i->assigned_officer_id)?->name];
             if (array_key_exists('agency_id', $d)) {
                 abort_unless($r->user()->role === 'admin', 403);
                 $i->agency_id = $d['agency_id'];
@@ -146,7 +148,7 @@ class IncidentController extends Controller
             }
             $i->assigned_officer_id = $d['assigned_officer_id'] ?? null;
             $i->save();
-            AuditLog::create(['actor_id' => $r->user()->id, 'action' => 'incident.assignment', 'record_type' => 'incident', 'record_id' => $i->id, 'metadata' => ['old_agency_id' => $old, 'agency_id' => $i->agency_id, 'officer_id' => $i->assigned_officer_id, 'note' => $d['note']]]);
+            AuditLog::recordChange($r->user(), 'incident.assignment', $i, $before, ['agency' => Agency::find($i->agency_id)?->name, 'assigned_officer' => User::find($i->assigned_officer_id)?->name, 'note' => $d['note']], $i->public_reference);
         });
 
         return new IncidentResource($incident->fresh());

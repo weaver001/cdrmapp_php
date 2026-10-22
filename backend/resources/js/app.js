@@ -132,13 +132,41 @@ if (management) {
     const module = management.dataset.module; const editor = document.querySelector('#editor'); const message = document.querySelector('#form-status');
     const content = !['users', 'messages', 'agencies', 'audit','dispatch-rules'].includes(module); let page = 1, last = 1;
     const endpoint = content ? `/api/v1/management/content/${module}` : module === 'agencies' ? '/api/v1/agencies' : `/api/v1/management/${module}`;
+    const auditActions = {
+        'user.created': 'Added account', 'user.updated': 'Updated account', 'user.saved': 'Saved account',
+        'content.created': 'Added content', 'content.updated': 'Updated content', 'content.saved': 'Saved content',
+        'content.deleted': 'Removed content', 'content.image_updated': 'Updated content image',
+        'agency.updated': 'Updated agency', 'dispatch.created': 'Added agency routing', 'dispatch.updated': 'Updated agency routing', 'dispatch.saved': 'Saved dispatch rule',
+        'message.trash': 'Removed contact message', 'message.restore': 'Restored contact message', 'message.destroy': 'Permanently deleted contact message',
+        'incident.created': 'Added incident report', 'incident.status': 'Changed incident status', 'incident.assignment': 'Changed incident assignment',
+    };
+    const auditValue = value => value == null ? 'None' : typeof value === 'boolean' ? (value ? 'Yes' : 'No') : typeof value === 'object' ? Object.entries(value).map(([key, item]) => `${statusLabel(key)}: ${auditValue(item)}`).join('; ') : String(value);
     async function mutate(path, method, data) { try { await api(path, method, data); message.textContent = 'Saved.'; await load(); } catch (e) { message.textContent = e.message; } }
     async function load() {
         try {
             const result = await api(`${endpoint}?page=${page}&trash=${document.querySelector('#trash')?.checked ? 1 : 0}`); const list = document.querySelector('#records'); list.replaceChildren();
             for (const item of result.data) {
-                const card = node('article', null, 'panel'); card.append(node('h2', item.title || item.name || item.action, 'font-semibold text-lg'));
-                if (module === 'audit') card.append(node('p', `${date(item.created_at)} · actor ${item.actor_id} · ${JSON.stringify(item.metadata)}`));
+                const card = node('article', null, 'panel'); card.append(node('h2', module === 'audit' ? (auditActions[item.action] || statusLabel(item.action)) : module === 'dispatch-rules' ? item.agency?.name : item.title || item.name || item.action, 'font-semibold text-lg'));
+                if (module === 'audit') {
+                    card.append(node('p', item.record_label || `${item.record_type} #${item.record_id}`, 'font-semibold mt-2'));
+                    card.append(node('p', `By ${item.actor_name || item.actor?.name || 'Unknown user'} · ${date(item.created_at)}`, 'text-sm my-2'));
+                    const metadata = item.metadata || {};
+                    const details = node('dl', null, 'grid gap-2 whitespace-pre-line text-sm');
+                    if (metadata.before || metadata.after) {
+                        const before = metadata.before || {}, after = metadata.after || {};
+                        for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+                            if (JSON.stringify(before[key]) === JSON.stringify(after[key])) continue;
+                            details.append(node('dt', statusLabel(key), 'font-semibold'), node('dd', `${auditValue(before[key])} → ${auditValue(after[key])}`));
+                        }
+                    } else {
+                        for (const [key, value] of Object.entries(metadata)) details.append(node('dt', statusLabel(key), 'font-semibold'), node('dd', auditValue(value)));
+                    }
+                    card.append(details);
+                }
+                else if (module === 'dispatch-rules') {
+                    card.append(node('p', item.active ? 'Automatic routing enabled' : 'Automatic routing disabled — reports go to triage', 'my-3'));
+                    card.append(button('Edit routing', () => { editor.elements.agency_id.value = item.agency_id; editor.elements.active.checked = item.active; editor.scrollIntoView({ behavior: 'smooth' }); }));
+                }
                 else if (module === 'agencies') {
                     card.append(node('p', `${item.type === 'FIRE' ? 'BFP' : item.type} · ${item.jurisdiction || 'Jurisdiction not configured'} · ${item.emergency_phone || 'No emergency number configured'}`));
                     card.append(button('Edit contact / jurisdiction', async () => { const jurisdiction = prompt('Jurisdiction description (does not define automatic routing boundaries):', item.jurisdiction || ''); if (jurisdiction === null) return; const emergency_phone = prompt('Official confirmed emergency telephone:', item.emergency_phone || ''); if (emergency_phone === null) return; await mutate(`/api/v1/management/agencies/${item.id}`, 'PATCH', { name: item.name, jurisdiction, emergency_phone, active: item.active }); }));
@@ -173,14 +201,14 @@ if (management) {
     editor?.addEventListener('submit', async e => {
         e.preventDefault();
         if (saving) return;
-        const id = editor.elements.id.value;
+        const id = module === 'dispatch-rules' ? '' : editor.elements.id.value;
         const file = content ? editor.elements.namedItem('image')?.files?.[0] : null;
         const body = formBody(editor);
         const fields = [...editor.elements].map(field => [field, field.disabled]);
         let contentSaved = false;
         saving = true;
         fields.forEach(([field]) => { field.disabled = true; });
-        message.textContent = 'Saving content…';
+        message.textContent = content ? 'Saving content…' : 'Saving…';
         try {
             const result = await api(editor.dataset.endpoint + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', body);
             if (content) {
@@ -193,7 +221,9 @@ if (management) {
                 if (!uploaded.data?.image_path || !uploaded.data?.image_url) throw new Error('The server did not confirm a saved image. Please retry the image upload.');
                 editor.elements.namedItem('image').value = '';
             }
-            message.textContent = file ? 'Content and image saved.' : content ? 'Content saved. No new image was selected.' : 'Saved.';
+            editor.reset();
+            editor.elements.id.value = '';
+            message.textContent = result.message || (file ? 'Content and image saved successfully.' : content ? 'Content saved successfully.' : module === 'users' ? 'Account saved successfully.' : 'Agency routing saved successfully.');
             await load();
         } catch (error) {
             message.textContent = contentSaved ? `Content saved, but image upload failed: ${error.message}` : error.message;
@@ -202,7 +232,7 @@ if (management) {
             fields.forEach(([field, disabled]) => { field.disabled = disabled; });
         }
     });
-    editor?.addEventListener('reset', () => { setTimeout(() => { editor.elements.id.value = ''; }, 0); });
+    editor?.addEventListener('reset', () => { editor.elements.id.value = ''; message.textContent = ''; });
     document.querySelector('#trash')?.addEventListener('change', () => { page = 1; load(); });
     document.querySelector('#manage-prev').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#manage-next').onclick = () => { if (page < last) { page++; load(); } }; load();
 }
