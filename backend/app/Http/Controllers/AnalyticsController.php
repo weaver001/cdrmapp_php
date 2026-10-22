@@ -57,9 +57,9 @@ class AnalyticsController extends Controller
             };
             $write(['Created UTC', now()->toISOString(), 'Authorized user ID', $r->user()->id]);
             $write(['Filters', json_encode($r->query())]);
-            $write(['Reference', 'Agency ID', 'Status', 'Received UTC', 'Description']);
-            foreach ($q->cursor() as $i) {
-                $write([$i->public_reference, $i->agency_id, $i->workflow_status, $i->received_at->toISOString(), $i->description]);
+            $write(['Reference', 'Agency ID', 'Agency', 'Status', 'Received UTC', 'Description']);
+            foreach ($q->with('agency')->lazyById(500) as $i) {
+                $write([$i->public_reference, $i->agency_id, $i->agency?->name ?? 'Needs triage', $i->workflow_status, $i->received_at->toISOString(), $i->description]);
             }fclose($f);
         }, 'incidents.csv', ['Content-Type' => 'text/csv']);
     }

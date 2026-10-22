@@ -16,7 +16,7 @@ The supplied master specification is the implementation specification; the DOCX 
 
 ## Measured validation
 
-- Backend: 14 tests, 104 assertions passed separately with MySQL and SQLite after adding a test-database guard. MySQL uses cdrmapp_testing; SQLite uses :memory:. TestCase overrides container environment before migrations and refuses non-test database names.
+- Backend: 17 tests, 136 assertions passed separately with MySQL and SQLite after adding a test-database guard. MySQL uses cdrmapp_testing; SQLite uses :memory:. TestCase overrides container environment before migrations and refuses non-test database names.
 - Browser/HTTP smoke: citizen submission + exact retry created one incident; FIRE could read it; PNP was denied; staff session dashboard, details and published CMS content worked without uncaught JavaScript errors. A screenshot is saved under docs/screenshots. The committed repeatable smoke test uses local synthetic data only.
 - Android: Gradle :app:assembleDebug, :app:testDebugUnitTest, :app:lintDebug completed. RepositoryTest executed 2 tests, 0 failures/errors/skips, covering retained retry payload/key through failure and login ownership. No device UI/instrumentation tests were executed.
 - Frontend assets: npm build completed. The large map overlay is loaded only when configured/needed; Vite still warns about its chunk size.
@@ -50,3 +50,9 @@ Next coding work: implement native media UI, expand device/instrumentation tests
 ## Saved environment draft
 
 The install_script and start_skill are saved, along with Google Maps/Firebase configuration variable names and restricted network additions for GitHub API, Google Maps assets/tiles, OAuth and FCM. Existing package-manager presets were preserved. Saving did not publish or validate a fresh restored task. Review and save the draft in environment settings, then publish the environment when desired.
+
+## Agency labels and map defaults update
+
+The shared catalog now presents Fire Department (BFP), Police Department (PNP), and MDRRMO in that order. Existing databases are upgraded by 2026_10_22_000003_standardize_default_agencies without changing agency/category IDs or historical references. Existing activation flags, contact configuration and custom categories are preserved. Seeder reruns do not duplicate the defaults. Web filters/account management and Android reporting read the same catalog. Map markers and CSV exports include full agency names. Initial web and Android map views now center on San Jose del Monte, Bulacan; this does not change dispatch jurisdiction.
+
+Both backend database suites passed 17 tests and 136 assertions for this update. The updated code must be deployed and `php artisan migrate --force` run in Laravel Cloud to update production records.

@@ -15,8 +15,8 @@ class DispatchTest extends TestCase
 
     public function test_unconfigured_outside_inactive_and_conflicting_jurisdictions_require_triage(): void
     {
-        $a = Agency::create(['name' => 'Synthetic Fire', 'type' => 'FIRE', 'active' => true]);
-        $b = Agency::create(['name' => 'Synthetic Other', 'type' => 'PNP', 'active' => true]);
+        $a = Agency::where('type', 'FIRE')->firstOrFail();
+        $b = Agency::where('type', 'PNP')->firstOrFail();
         $c = IncidentCategory::create(['name' => 'Synthetic event', 'agency_id' => $a->id]);
         $dispatch = app(Dispatch::class);
         $this->assertNull($dispatch->agency($c->id, 14.5, 121));

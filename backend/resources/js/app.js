@@ -46,7 +46,7 @@ if (dashboard) {
         await mapsPromise;
         if (!map) {
             const { GoogleMapsOverlay, HeatmapLayer } = await import('./map-overlay'); HeatmapLayerClass = HeatmapLayer;
-            map = new google.maps.Map(document.querySelector('#map'), { center: { lat: 12.8797, lng: 121.7740 }, zoom: 6, mapTypeControl: false });
+            map = new google.maps.Map(document.querySelector('#map'), { center: { lat: 14.8139, lng: 121.0453 }, zoom: 13, mapTypeControl: false });
             overlay = new GoogleMapsOverlay({ interleaved: false, layers: [] }); overlay.setMap(map);
         }
         return map;
@@ -56,7 +56,7 @@ if (dashboard) {
         markers.forEach(m => m.setMap(null)); markers = [];
         if (document.querySelector('#show-pins').checked) for (const i of latest) {
             const color = i.agency?.type === 'MDRRMO' ? '#7e22ce' : i.agency?.type === 'FIRE' ? '#dc2626' : '#1d4ed8';
-            const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.agency?.type || 'TRIAGE'} ${i.public_reference}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+            const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.agency?.name || 'Needs triage'} ${i.public_reference}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
             m.addListener('click', () => detail(i.id)); markers.push(m);
         }
         const p = params(); p.set('exploratory', document.querySelector('#exploratory').checked ? '1' : '0');
@@ -133,7 +133,7 @@ if (management) {
                 const card = node('article', null, 'panel'); card.append(node('h2', item.title || item.name || item.action, 'font-semibold text-lg'));
                 if (module === 'audit') card.append(node('p', `${date(item.created_at)} · actor ${item.actor_id} · ${JSON.stringify(item.metadata)}`));
                 else if (module === 'agencies') {
-                    card.append(node('p', `${item.type} · ${item.jurisdiction || 'Jurisdiction not configured'} · ${item.emergency_phone || 'No emergency number configured'}`));
+                    card.append(node('p', `${item.type === 'FIRE' ? 'BFP' : item.type} · ${item.jurisdiction || 'Jurisdiction not configured'} · ${item.emergency_phone || 'No emergency number configured'}`));
                     card.append(button('Edit contact / jurisdiction', async () => { const jurisdiction = prompt('Jurisdiction description (does not define automatic routing boundaries):', item.jurisdiction || ''); if (jurisdiction === null) return; const emergency_phone = prompt('Official confirmed emergency telephone:', item.emergency_phone || ''); if (emergency_phone === null) return; await mutate(`/api/v1/management/agencies/${item.id}`, 'PATCH', { name: item.name, jurisdiction, emergency_phone, active: item.active }); }));
                 } else if (module === 'messages') {
                     card.append(node('p', item.email), node('p', item.message, 'whitespace-pre-line my-3'));

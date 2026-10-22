@@ -51,12 +51,12 @@ class ManagementController extends Controller
 
     public function agencies()
     {
-        return ['data' => Agency::where('active', true)->get()];
+        return ['data' => Agency::where('active', true)->inDisplayOrder()->get()];
     }
 
     public function categories()
     {
-        return ['data' => IncidentCategory::where('active', true)->get()];
+        return ['data' => IncidentCategory::where('active', true)->inDisplayOrder()->get()];
     }
 
     public function users(Request $r)

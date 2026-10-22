@@ -16,7 +16,7 @@ class TestCase extends BaseTestCase
             throw new \RuntimeException('Unsupported test database.');
         }
         $app->instance('env', 'testing');
-        $app['config']->set(['app.env' => 'testing', 'database.default' => $driver, 'database.connections.sqlite.database' => ':memory:', 'database.connections.sqlite.url' => null, 'database.connections.mysql.database' => 'cdrmapp_testing', 'database.connections.mysql.url' => null, 'cache.default' => 'array', 'session.driver' => 'array', 'queue.default' => 'sync', 'mail.default' => 'array']);
+        $app['config']->set(['app.env' => 'testing', 'database.default' => $driver, 'database.connections.sqlite.database' => ':memory:', 'database.connections.sqlite.url' => null, 'database.connections.mysql.database' => 'cdrmapp_testing', 'database.connections.mysql.url' => null, 'cache.default' => 'array', 'session.driver' => 'array', 'queue.default' => 'sync', 'mail.default' => 'array', 'services.fcm.enabled' => false]);
         $app['db']->purge('mysql');
         $app['db']->purge('sqlite');
         $name = $app['db']->connection($driver)->getDatabaseName();

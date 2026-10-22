@@ -25,7 +25,7 @@ foreach (['admin', 'citizen', 'FIRE', 'PNP'] as $role) {
         throw new RuntimeException('Existing account is not a test fixture.');
     }$u->forceFill(['name' => 'SYNTHETIC '.$role, 'password' => $credentials[$role]['password'], 'role' => in_array($role, ['FIRE', 'PNP']) ? 'officer' : $role, 'agency_id' => in_array($role, ['FIRE', 'PNP']) ? Agency::where('type', $role)->value('id') : null, 'email_verified_at' => now(), 'active' => true])->save();
 }
-$category = IncidentCategory::where('name', 'Fire Department')->first();
+$category = IncidentCategory::where('name', Agency::DEFAULT_NAMES['FIRE'])->where('agency_id', Agency::where('type', 'FIRE')->value('id'))->firstOrFail();
 $agency = Agency::where('type', 'FIRE')->first();
 DispatchRule::firstOrCreate(['name' => 'SYNTHETIC browser-only rectangle'], ['category_id' => $category->id, 'agency_id' => $agency->id, 'south' => 14, 'north' => 15, 'west' => 120, 'east' => 122, 'active' => true]);
 file_put_contents($path, json_encode($credentials));

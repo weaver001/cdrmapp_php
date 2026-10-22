@@ -99,7 +99,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Active agencies, ordered Fire Department (BFP), Police Department (PNP), MDRRMO, then other configured agencies. Stable internal types are FIRE, PNP, MDRRMO; IDs are preserved during catalog upgrades."
       }
     },
     "/api/v1/analytics/heatmap": {
@@ -1544,7 +1545,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Active incident categories for all clients, including Android. Default labels match the shared agency catalog; custom categories are retained."
       }
     },
     "/api/v1/incidents": {

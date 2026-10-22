@@ -62,7 +62,7 @@ class WebController extends Controller
     {
         Gate::authorize('staff');
 
-        return view('dashboard', ['agencies' => Agency::all(), 'categories' => IncidentCategory::all()]);
+        return view('dashboard', ['agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
     }
 
     public function manage(string $module)
@@ -70,7 +70,7 @@ class WebController extends Controller
         Gate::authorize('admin');
         abort_unless(in_array($module, array_merge(ContentController::TYPES, ['users', 'messages', 'agencies', 'audit', 'dispatch-rules']), true), 404);
 
-        return view('manage', ['module' => $module, 'agencies' => Agency::all(), 'categories' => IncidentCategory::all()]);
+        return view('manage', ['module' => $module, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
     }
 
     public function forgot(Request $r)

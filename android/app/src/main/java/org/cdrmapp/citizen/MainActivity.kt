@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
     Text(locationMessage)
     if (BuildConfig.MAPS_KEY.isBlank()) Text("Google Maps key is not configured in this build. Reporting requires a selected location; configure the Android Maps key and rebuild.")
     else {
-     val camera = rememberCameraPositionState { this.position = CameraPosition.fromLatLngZoom(LatLng(12.8797,121.7740), 5f) }
+     val camera = rememberCameraPositionState { this.position = CameraPosition.fromLatLngZoom(LatLng(14.8139,121.0453), 13f) }
      LaunchedEffect(position) { position?.let { camera.position = CameraPosition.fromLatLngZoom(it, 16f) } }
      GoogleMap(Modifier.fillMaxWidth().height(280.dp), cameraPositionState = camera, onMapClick = { position = it; source = "manual"; accuracy = null; observedAt = null; locationMessage = "Manually selected incident location. Precision is not measured." }) {
       position?.let { Marker(state = rememberUpdatedMarkerState(position = it), title = "Incident location") }
