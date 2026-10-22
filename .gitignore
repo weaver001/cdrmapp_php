@@ -1,0 +1,13 @@
+/backend/.env
+/infra/.env
+/backend/vendor/
+/backend/node_modules/
+/backend/public/build/
+/android/local.properties
+/android/.gradle/
+/android/**/build/
+*.jks
+*.keystore
+
+__pycache__/
+*.pyc

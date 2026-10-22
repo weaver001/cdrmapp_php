@@ -1,0 +1,53 @@
+name: cdrmapp
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: cdrmapp-php:local
+  working_dir: /app
+  user: "1000:1000"
+  volumes:
+    - ../backend:/app
+  environment:
+    DB_CONNECTION: mysql
+    DB_HOST: db
+    DB_PORT: 3306
+    DB_DATABASE: cdrmapp
+    DB_USERNAME: cdrmapp
+    DB_PASSWORD: ${DB_PASSWORD:?Run infra/setup-local.sh first}
+    GOOGLE_MAPS_WEB_KEY: null
+    FCM_ENABLED: null
+    FCM_PROJECT_ID: null
+    FCM_SERVICE_ACCOUNT_FILE: null
+    MAIL_MAILER: smtp
+    MAIL_HOST: mailpit
+    MAIL_PORT: 1025
+  depends_on:
+    db:
+      condition: service_healthy
+services:
+  web:
+    <<: *app
+    command: php artisan serve --no-reload --host=0.0.0.0 --port=8000
+    ports: ["127.0.0.1:8000:8000"]
+  queue:
+    <<: *app
+    command: php artisan queue:work --tries=3 --timeout=60
+  db:
+    image: mysql:8.4@sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69
+    environment:
+      MYSQL_DATABASE: cdrmapp
+      MYSQL_USER: cdrmapp
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Run infra/setup-local.sh first}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Run infra/setup-local.sh first}
+    volumes: ["db-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysql --protocol=TCP -h 127.0.0.1 -u root -e 'SELECT 1'"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  mailpit:
+    image: axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    ports: ["127.0.0.1:8025:8025"]
+volumes:
+  db-data:

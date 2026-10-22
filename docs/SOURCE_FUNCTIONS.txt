@@ -1,0 +1,306 @@
+Account and Registration Management Module
+This feature lets the administrators populate accounts of different users such as police, fire stations and concerned local government units and an interface where end users can register in the system.
+
+Incident Report Management Module
+This module entails the citizens to report incidents and directly transmit messages to the concerned unit. The system is focused on fire and crime incidents.
+Agency Management Module
+This module entails the authorized government agencies to receive the reports sent by the citizens. This module lets the personnel provide details in terms of the reports.
+Report Queuing Management Module
+This module entails the reports to be filtered to determine the dates of submitted reports.
+Response Management Module
+This module lets the submitted reports to be encoded in the system. This feature is part of the monitoring of the incident reports.
+
+Heat Map Analysis
+This involves aggregating data from various reported and validated crimes and incidents into a dashboard that management can use to provide strategic assistance. The heatmap analysis is integral to the decision support mechanism, allowing for the assessment of whether certain locations are prone to incidents.
+
+SYSTEM SNIPPETS – WEB APPLICATION (ADMIN SIDE)
+Admin Dashboard
+
+Figure 7. Admin Dashboard
+This diagram illustrates the system's functionalities, which encompass announcement delivery, report management, and account administration. Within the administrative interface, the system offers incident location tracking. Moreover, to enhance content flexibility, a content management module has been implemented, enabling administrators to modify system content as needed. This module entails to present the different reports sent and by the residents of users. In this module the system will alert the administrator when a new report has been received. The dashboard will refresh every 15 seconds to avoid freezing of internet connection and receiving reports.
+
+Update Administrator Profile Module
+
+Figure 8. Admin Profile Interface
+This feature allows the administrator to update the various details of the account. The administrator also has the capability to update the password. Once done, the administrator can click “update record” button to update the profile.
+Response Management Module
+
+Figure 9. Incident Watch List Interface
+This feature is being administered in which customized reports can be generated. The figure shows the system screenshot indicating sample emergency and incident reports. This diagram visually represents the incident reports submitted by users, which can be filtered by department. Each report includes the GPS location of the incident, a key feature of the developed system. Additionally, incident monitoring is facilitated, allowing reports to be tagged as "done" or "in progress."
+Agency Management Module
+
+Figure 10. Received Reports Interface
+This feature allows the administrator to view all the emergencies that were reported and recorded in the system, giving several emergencies that have been reported for each aspect, which is police, fire and MDDRMO report. A total number of all reports are shown as well. A recent report for each department is displayed in its corresponding card. It involves the location of the citizen who reported it, the location of the system with coordinates, the message that the citizen sent, as well as the name of the citizen.
+Report Queuing Management Module
+
+Figure 11. Generate Reports Interface
+The system aggregates reports of various incidents submitted by users, whether they are being addressed or are still in the queue. This functionality enables the identification of trends in incident frequency, allowing for timely intervention and the formulation of appropriate strategies. Admins have the functionality to generate reports by a specific date range, then they can view the summary of the reports. Admins also have the option to print the report if necessary.
+
+Account and Registration Management Module
+
+Figure 12. Manage Users Interface
+This feature enables administrators to grant access privileges to users within the police, fire and MDRRMO departments, ensuring flexibility and secure access management. These permissions can be modified using the system's action feature, allowing administrators to alter or delete access privileges as needed.
+
+
+Account and Registration Management Module – Add Users Screen
+
+Figure 13. Add User Interface
+This feature enables administrators to add users’ names, email addresses, to choose what department they belong in or if they are supposed to be administrators, determine if they are to be active users and choose to upload an image of the user. Once done, the administrator can click the “add” button to add a user.
+
+CMS Management (Infographics)
+
+Figure 14. Infographics Management Interface
+This feature enables administrators to edit or delete existing infographics that have been created. In this screen, administrators can view the title/image of an infographic, what the infographic is about as well as the action buttons as shown in the snippet.
+
+
+CMS Management (Infographics) – Add Infographics
+
+Figure 15. Add Infographics Interface
+This feature enables administrators to create an infographic as part of the content management system for the web application. A title can be created, as well as formatting for the infographic’s description, as well as an image to support the infographic.  Once done, the administrator can click the “add” button to add an infographic.
+
+CMS Management (Announcements)
+
+Figure 16. Announcements Management Interface
+This feature enables administrators to edit or delete existing announcements that have been created. In this screen, administrators can view the title/image of an announcement, what the announcement is about as well as the action buttons as shown in the snippet.
+
+
+CMS Management (Announcements) – Add Announcements
+
+Figure 17. Add Announcement Interface
+This feature enables administrators to create an announcement as part of the content management system for the web application. A title can be created, as well as formatting for the announcement’s description, as well as an image to support the announcement.  Once done, the administrator can click the “add” button to add an announcement.
+
+CMS Management (Services)
+
+Figure 18. Services Management Interface
+This feature enables administrators to edit or delete existing services that have been created. In this screen, administrators can view the title/image of a service, what the service is about as well as the action buttons as shown in the snippet.
+
+
+
+CMS Management (Services) – Add Services
+
+Figure 19. Add Service Interface
+This feature enables administrators to create a service as part of the content management system for the web application. A title can be created, as well as formatting for the service’s description, as well as an image to support the service.  Once done, the administrator can click the “add” button to add a service.
+
+CMS Management (Team Members)
+
+Figure 20. Team Members Management Interface
+This feature enables administrators to edit or delete existing team members that have been created. In this screen, administrators can view the name/image of a team member, what the position of the team member is, the description of that team member as well as the action buttons as shown in the snippet.
+
+
+CMS Management (Team Members) – Add Team Members
+
+Figure 21. Add Team Member Interface
+This feature enables administrators to add a team member as part of the content management system for the web application. The name of the team member can be inputted, as well as the user’s email, position in the team, as well as formatting for the description of the team member, as well as an image to support the know what the user looks like.  Once done, the administrator can click the “add” button to add a new team member.
+
+CMS Management (Contact Details)
+
+Figure 22. Contact Details Management Interface
+This feature enables administrators to edit the contact details that has been created. In this screen, administrators can view the map frame value, the title of the area/location, the description of the location, as well as the action buttons as shown in the snippet.
+
+
+CMS Management (FAQs)
+
+Figure 23. FAQs Management Interface
+This feature enables administrators to edit or delete existing FAQs that have been created. In this screen, administrators can view the title/image of the FAQ, what the FAQ is about as well as the action buttons as shown in the snippet.
+
+
+
+CMS Management (FAQs) – Add FAQs
+
+Figure 24. Add FAQ Interface
+This feature enables administrators to create an FAQ as part of the content management system for the web application. A title can be created, as well as formatting for the FAQ’s description, as well as an image to support the FAQ.  Once done, the administrator can click the “add” button to add an FAQ.
+
+
+CMS Management (Messages)
+
+Figure 25. Messages Management Interface
+This feature enables administrators to delete messages that end users have sent. As part of the content management system, users who access the web application have the capability to send messages for any issues they encounter within the web application. Any messages users sent end up here. It details the user who sent the message, what the message is all about, as well as the action button as shown in the snippet. Administrators can arrange messages or search for specific messages if a long list is shown.
+CMS Management (Messages) – Trash Message Screen
+
+Figure 26. Trash Messages Interface
+Any message that is deemed illegitimate or accidentally sent to trash, end up here. Details such as who sent the message and what the message is all about, is retained. The administrator has the option to restore the trashed message, or permanently delete it from the system.
+
+
+Integration of Incident Map
+
+Figure 27. Map Location Integration
+This module empowers the duty officer to swiftly locate residents who have reported a crime or disaster. Furthermore, the system automatically detects the sender's report location and efficiently forwards it to the appropriate department and authorities for prompt action.
+
+
+
+SYSTEM SNIPPETS – WEB APPLICATION (CITIZEN SIDE)
+Landing Screen
+
+Figure 28. Web Application Landing Page
+When an end user first accesses the web application, they are directed to this landing screen, wherein a carousel of the created infographics from the admin side are displayed.
+
+
+Services Screen
+
+Figure 29. Web Application Services Page
+A user can check out the services displayed within the web application, as part of the content managed by the administrators.
+
+
+
+
+Announcements Screen
+
+Figure 30. Web Application Announcements Page
+A user can check out the announcements displayed within the web application, as part of the content managed by the administrators.
+
+
+
+Our Team Screen
+
+Figure 31. Web Application Team Page
+A user can check out the team displayed within the web application, as part of the content managed by the administrators.
+
+
+
+
+Contact Us Screen
+
+Figure 32. Web Application Contact Us Page
+A user can send a message with their complete details within the web application, as well as view the map of the main location as part of the content managed by the administrators.
+
+
+
+FAQs Screen
+
+Figure 33. Web Application FAQs Page
+A user can check out the FAQs displayed within the web application, as part of the content managed by the administrators.
+
+
+
+
+SYSTEM SNIPPETS – WEB APPLICATION (OFFICERS SIDE)
+Login Functionality
+Figure 34. Admin/Officers Login Page
+Users (admin and officers) can login with their credentials in this page. They just have to input their username/email address and password, they can have the option to tick the checkbox to remember their login session, or prompt to reset password if they have forgotten it.
+
+
+MDDRMO Officer Functionalities
+Officer Dashboard
+
+Figure 35. MDDRMO Officer Dashboard
+This snippet illustrates the dashboard that can be viewed by the MDDRMO officer. The MDRRMO officer can view emergency reports related to the department, the emergency response watchlist as well as the map that pinpoints where emergency incidents are reported and marked.
+
+Update MDDRMO Officer Profile Module
+
+Figure 36. MDDRMO Officer Profile
+This feature allows the MDDRMO officer to update the various details of the account. The officer also has the capability to update the password. Once done, the officer can click “update record” button to update the profile.
+
+
+
+MDDRMO Report Management Module
+
+Figure 37. MDDRMO Report Management Interface
+This feature allows the administrator to view all the emergencies that were reported and recorded in the system, giving several emergencies that have been reported for MDDRMO. A total number of all reports are shown as well. A recent report for the department is displayed in its corresponding card. It involves the location of the citizen who reported it, the location of the system with coordinates, the message that the citizen sent, as well as the name of the citizen.
+MDDRMO Response Management Module
+
+Figure 38. MDDRMO Incident Watch List Interface
+This feature is being administered in which customized reports can be generated. The figure shows the system screenshot indicating incident reports for MDDRMO. This diagram visually represents the incident reports submitted by users, as each report includes the GPS location of the incident, a key feature of the developed system. Additionally, incident monitoring is facilitated, allowing reports to be tagged as "done" or "in progress."
+
+MDDRMO Map Integration
+
+Figure 39. MDDRMO Map Location Integration
+This module empowers the MDDRMO officer to swiftly locate residents who have reported an emergency disaster. Furthermore, the system automatically detects the sender's report location and efficiently forwards it to the MDDRMO and its authorities for prompt action. Emergency incidents for MDDRMO are indicated as purple icons as shown in the map.
+
+PNP Officer Functionalities
+Officer Dashboard
+
+Figure 40. PNP Officer Dashboard
+This snippet illustrates the dashboard that can be viewed by the PNP officer. The PNP officer can view crime reports related to the department, the crime response watchlist as well as the map that pinpoints where crimes are reported and marked.
+
+
+Update PNP Officer Profile Module
+
+Figure 41. PNP Officer Profile
+This feature allows the PNP officer to update the various details of the account. The officer also has the capability to update the password. Once done, the officer can click “update record” button to update the profile.
+
+
+
+PNP Report Management Module
+
+Figure 42. PNP Report Management Interface
+This feature allows the administrator to view all the crimes that were reported and recorded in the system, giving several emergencies that have been reported for PNP. A total number of all reports are shown as well. A recent report for the department is displayed in its corresponding card. It involves the location of the citizen who reported it, the location of the system with coordinates, the message that the citizen sent, as well as the name of the citizen.
+
+PNP Response Management Module
+
+Figure 43. PNP Incident Watch List Interface
+This feature is being administered in which customized reports can be generated. The figure shows the system screenshot indicating incident reports for PNP. This diagram visually represents the incident reports submitted by users, as each report includes the GPS location of the incident, a key feature of the developed system. Additionally, incident monitoring is facilitated, allowing reports to be tagged as "done" or "in progress."
+
+PNP Map Integration
+
+Figure 44. PNP Map Location Integration
+This module empowers the PNP officer to swiftly locate residents who have reported a crime. Furthermore, the system automatically detects the sender's report location and efficiently forwards it to the PNP and its authorities for prompt action. Crimes for PNP are indicated as police icons as shown in the map.
+
+
+Fire Department Officer Functionalities
+Officer Dashboard
+
+Figure 45. Fire Department Officer Dashboard
+This snippet illustrates the dashboard that can be viewed by the Fire department officer. The Fire department officer can view fire reports related to the department, the fire response watchlist as well as the map that pinpoints where fires are reported and marked.
+
+Update Fire Department Officer Profile Module
+
+Figure 46. Fire Department Officer Profile
+This feature allows the Fire department officer to update the various details of the account. The officer also has the capability to update the password. Once done, the officer can click “update record” button to update the profile.
+
+
+
+Fire Department Report Management Module
+
+Figure 47. Fire Department Report Management Interface
+This feature allows the administrator to view all the fires that were reported and recorded in the system, giving several emergencies that have been reported for the Fire department. A total number of all reports are shown as well. A recent report for the department is displayed in its corresponding card. It involves the location of the citizen who reported it, the location of the system with coordinates, the message that the citizen sent, as well as the name of the citizen.
+Fire Department Response Management Module
+
+Figure 48. Fire Department Incident Watch List Interface
+This feature is being administered in which customized reports can be generated. The figure shows the system screenshot indicating incident reports for the Fire department. This diagram visually represents the incident reports submitted by users, as each report includes the GPS location of the incident, a key feature of the developed system. Additionally, incident monitoring is facilitated, allowing reports to be tagged as "done" or "in progress."
+
+Fire Department Map Integration
+
+Figure 49. Fire Department Map Location Integration
+This module empowers the Fire department officer to swiftly locate residents who have reported a fire. Furthermore, the system automatically detects the sender's report location and efficiently forwards it to the Fire department and its authorities for prompt action. Fires for the fire department are indicated as fire icons as shown in the map.
+
+SYSTEM SNIPPETS – MOBILE APPLICATION (FOR CITIZENS)
+Landing Page
+
+Figure 50. Mobile Application Landing Page
+Upon opening the mobile application, end users are greeted with the app’s landing page. Users are presented with registration and login functionalities. If users have no account yet, they can choose to register one. If they already have one, they can login using their credentials.
+Registration Module
+
+Figure 51. Mobile Application Registration Functionality
+If users have no account yet, they can choose to register one. They will be asked to enter their full name, email address, date of birth, and the confirmation of their passwords. Once all credentials are ready, they can click the “register” button.
+
+
+Login Module
+
+Figure 52. Mobile Application Login Functionality
+If they already have one, they can login using their credentials. They will be asked to input their username/email and password. Once all credentials are ready, they can click “login” to login to their account. If users have forgotten their password, they will get a prompt in updating their password.
+
+Email Verification for Login
+
+Figure 53. Email Verification for Login
+The first time that users will be logging in, it will be successful; however, for consecutive logins, their email must be verified to proceed. A verification email will be sent to the user’s indicated email address. Once the email is verified, logins are once again successful.
+
+Decision Support Mechanism Integration
+A decision support system (DSS) is a computer program application used to provide basis and references based on the reported crimes and disaster.  The Decision Support Mechanism is integrated in the system thru the following features.
+
+
+Figure 54. Incident Report Filing
+
+Figure 55. Sending of Message and Choosing the Right Department
+
+
+Figure 56. Successful delivery of intended message with Toast
+The system is meticulously crafted for utmost convenience, incorporating design thinking principles to ensure users can effortlessly navigate the mobile application. Within the mobile interface, reporting an incident is as simple as pressing a single button, making it easily accessible even during uncertain situations. The intuitive navigation further enhances usability, allowing users to navigate with ease when time is of the essence.
+
+Account Updating Functionalities
+
+Figure 57. Update Profile Details
+This page allows users to update their profile details. It includes editing a user’s full name, date of birth, updating their profile picture (redirects to new page) and updating their email (redirects to new page). Once done, users can click “update profile” to reflect the necessary changes.
+
+
+Figure 58. Update Email
+This page allows users to update their email. It includes editing providing a new email address and updating the account password. Once done, users can click “update email” to reflect the necessary changes.

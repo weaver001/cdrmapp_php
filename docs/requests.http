@@ -1,0 +1,28 @@
+# VS Code REST Client examples. Set variables locally; do not commit tokens.
+@base = http://127.0.0.1:8000/api/v1
+@token = {{$processEnv CDRMAPP_LOCAL_TOKEN}}
+
+### Sign in (supply a local password via your process environment)
+POST {{base}}/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{"email":"citizen@synthetic.example.test","password":"{{$processEnv CDRMAPP_LOCAL_PASSWORD}}","device_name":"Local API client"}
+
+### Own or agency-scoped incidents
+GET {{base}}/incidents
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### A synthetic report: preserve the exact UUID/payload for retries
+POST {{base}}/incidents
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Accept: application/json
+
+{"category_id":1,"description":"SYNTHETIC local request example, not a real incident.","latitude":14.5995,"longitude":120.9842,"location_source":"manual","idempotency_key":"205a8472-5b75-4cf4-92d0-dc07b42365de"}
+
+### Authorized aggregate density
+GET {{base}}/analytics/heatmap?exploratory=0&west=120&east=122&south=14&north=15
+Authorization: Bearer {{token}}
+Accept: application/json
