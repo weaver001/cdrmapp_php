@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 import org.cdrmapp.citizen.data.*
 import retrofit2.HttpException
 
-data class CitizenState(val user: Citizen? = null, val categories: List<Category> = emptyList(), val incidents: List<Incident> = emptyList(), val detail: Incident? = null, val pending: Submission? = null, val page: Int = 1, val lastPage: Int = 1, val busy: Boolean = false, val message: String = "")
+data class CitizenState(val user: Citizen? = null, val categories: List<Category> = emptyList(), val incidents: List<Incident> = emptyList(), val detail: Incident? = null, val pending: Submission? = null, val page: Int = 1, val lastPage: Int = 1, val busy: Boolean = false, val message: String = "", val authMode: String = "Sign in")
 class CitizenViewModel(application: Application) : AndroidViewModel(application) {
  private val repo = Repository(SecureStore(application))
  private val mutable = MutableStateFlow(CitizenState())
@@ -36,7 +36,8 @@ class CitizenViewModel(application: Application) : AndroidViewModel(application)
   }
  }
  fun login(email: String, password: String) = run { val user = repo.login(email, password); mutable.value = mutable.value.copy(user = user); refreshInternal() }
- fun register(fields: Map<String, String>) = run { repo.api.register(fields); mutable.value = mutable.value.copy(message = "Account created. Open the verification email, then sign in.") }
+ fun register(fields: Map<String, String>) = run { repo.api.register(fields); mutable.value = mutable.value.copy(authMode = "Sign in", message = "Account created, Open the verification sent to your email.") }
+ fun authMode(mode: String) { if (!mutable.value.busy && mode in listOf("Sign in", "Register", "Reset password")) mutable.value = mutable.value.copy(authMode = mode, message = "") }
  fun forgot(email: String) = run { repo.api.forgot(mapOf("email" to email)); mutable.value = mutable.value.copy(message = "If the account exists, a password reset email has been sent.") }
  fun resend() = run { repo.api.resend(); mutable.value = mutable.value.copy(message = "Verification email requested.") }
  fun refresh() = run { refreshInternal() }

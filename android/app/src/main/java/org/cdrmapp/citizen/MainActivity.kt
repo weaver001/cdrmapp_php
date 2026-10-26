@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -38,7 +39,12 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
- override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent {
+ override fun onCreate(savedInstanceState: Bundle?) {
+  super.onCreate(savedInstanceState)
+  // Older Play services renderers access LifecycleRegistry during initialization.
+  // Initialize on the main thread before Maps Compose can start it on Dispatchers.IO.
+  if (BuildConfig.MAPS_KEY.isNotBlank()) MapsInitializer.initialize(this)
+  setContent {
   CdrmTheme {
    val vm: CitizenViewModel = viewModel(); val state by vm.state.collectAsStateWithLifecycle()
    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(20.dp)) {
@@ -139,7 +145,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable private fun AuthScreen(vm: CitizenViewModel, state: CitizenState) {
- var mode by remember { mutableStateOf("Sign in") }; var name by remember { mutableStateOf("") }; var email by remember { mutableStateOf("") }; var dob by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
+ val mode = state.authMode
+ var name by remember { mutableStateOf("") }; var email by remember { mutableStateOf("") }; var dob by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
+ LaunchedEffect(mode) { password = ""; confirm = ""; if (mode == "Sign in") { name = ""; dob = "" } }
  Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
   Text(mode, style = MaterialTheme.typography.headlineSmall)
   if (mode == "Register") { Field("Full name", name) { name = it }; Field("Date of birth (YYYY-MM-DD)", dob) { dob = it } }
@@ -149,7 +157,7 @@ class MainActivity : ComponentActivity() {
   Button(enabled = !state.busy && email.isNotBlank() && (mode == "Reset password" || password.isNotBlank()), onClick = {
    when(mode) { "Sign in" -> vm.login(email.trim(), password); "Register" -> vm.register(mapOf("name" to name.trim(), "email" to email.trim(), "date_of_birth" to dob, "password" to password, "password_confirmation" to confirm)); else -> vm.forgot(email.trim()) }
   }) { Text(mode) }
-  Row { for (choice in listOf("Sign in", "Register", "Reset password")) if (choice != mode) TextButton(onClick = { mode = choice; password = ""; confirm = "" }) { Text(choice) } }
+  Row { for (choice in listOf("Sign in", "Register", "Reset password")) if (choice != mode) TextButton(onClick = { vm.authMode(choice) }, enabled = !state.busy) { Text(choice) } }
  }
 }
 @Composable private fun Field(label: String, value: String, changed: (String) -> Unit) { OutlinedTextField(value = value, onValueChange = changed, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true) }

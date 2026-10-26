@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- The favicon's original 64 x 64 artwork, inside the adaptive icon safe area. -->
+    <group android:translateX="22" android:translateY="22">
+        <path android:fillColor="#f4b000" android:strokeColor="#005f35" android:strokeWidth="2"
+            android:pathData="M14,1 H50 A13,13 0,0 1,63 14 V50 A13,13 0,0 1,50 63 H14 A13,13 0,0 1,1 50 V14 A13,13 0,0 1,14 1 Z" />
+        <path android:pathData="M44,20 a17,17 0,1 0,0 24" android:fillColor="@android:color/transparent"
+            android:strokeColor="#005f35" android:strokeWidth="7.5" android:strokeLineCap="round" />
+    </group>
+</vector>
