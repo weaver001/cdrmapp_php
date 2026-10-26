@@ -20,7 +20,7 @@ Submission is a transaction: incident + initial history + notification jobs. Not
 
 Roles are fixed application roles (`admin`, `officer`, `citizen`); officers have one agency assignment. This implements the source roles by assignment rather than creating separate police/fire/MDRRMO authentication systems. A configurable fine-grained permission editor and multiple agency membership are not yet implemented.
 
-Routing matches category and administrator-configured latitude/longitude rectangles against active agencies. No matching rectangle or overlapping rectangles for conflicting agencies results in unassigned triage. Rectangular rules do not model arbitrary polygons; operational boundaries must be confirmed before configuring them. Agency jurisdiction text remains informational.
+Routing uses the active BFP, PNP or MDRRMO agency linked to the selected active category. Missing or inactive agencies/mappings go to triage. The Dispatch Rules module is retired; old rectangle and agency-routing settings remain stored for history but are no longer consulted. Agency jurisdiction text remains informational.
 
 Coordinates are the incident location. Fresh foreground GPS requires accuracy and an observation timestamp; manual pins explicitly carry no measured accuracy. Server timestamps are UTC; operational presentation uses Asia/Manila. Date filters are interpreted as Asia/Manila calendar dates and converted to UTC query bounds.
 
@@ -31,3 +31,10 @@ Heatmap cells are 0.01 degrees (latitude-dependent area), with a minimum count o
 The shared agency/category catalog uses Fire Department (BFP), Police Department (PNP), and MDRRMO, in that order. Existing internal types FIRE, PNP, and MDRRMO remain stable identifiers; FIRE represents BFP. The data migration renames existing agency and default-category rows in place and creates missing defaults. IDs, existing incident references, staff assignments, dispatch rules, contact details, activation flags and custom incident categories are preserved. Both Blade and Android use this backend catalog, and CSV exports include agency names. Initial web and Android incident-map views center on San Jose del Monte, Bulacan (14.8139, 121.0453; zoom 13); map centering does not configure dispatch jurisdiction or preselect an incident location.
 
 For an existing deployment run `php artisan migrate --force` after deploying this revision. Fresh setup and repeatable seeding also install these labels without duplicating catalog entries.
+
+
+## Report status and separate map
+
+Report status is `need_action` or `done`, with reversible staff actions and a recorded history/audit. The Incident accessor and status-query scope normalize older stored states without a destructive migration: resolved/closed/rejected/duplicate are Done, and remaining legacy values are Need action. New reports start at Need action. Verification is independent of completion and continues to control validated heatmap inclusion.
+
+`/dashboard` renders the report table, including address and coordinates, without loading Google Maps or the map overlay. `/incident-map` uses the same authorized filters and paginated report data for agency icons/heatmap, and opens report details from pins. Switching pages preserves the filter query. CSV includes the visible status label and location/coordinates. Infographics is retired and the public home page now shows announcements; historical infographic records and files are preserved.

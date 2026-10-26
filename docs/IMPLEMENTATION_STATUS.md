@@ -9,7 +9,7 @@ The supplied master specification is the implementation specification; the DOCX 
 | 3 Incident API | Transactional submission, per-user idempotency, request conflict detection, fresh GPS/manual location validation, agency-based automatic routing and triage, scoped lists/details, assignment/rerouting, responses, verification, lifecycle/history/audit, private evidence | Polygon jurisdiction rules, broader audit coverage and operational escalation policy |
 | 4 Staff web | Responsive green dashboard, agency scope, 15-second targeted polling paused when hidden, lists/filters/pagination, details, response notes, status controls, assignment, rerouting, unread notification handling, CSV and current-page printing | Full report-layout customization and server-generated PDF; advanced trend visualizations |
 | 5 Maps/DSS | Google Maps JS + supported deck.gl overlay code, authorized aggregate grid, validation/test/rejection/duplicate/accuracy exclusion, threshold suppression, filters and cell cap, cache version invalidation | No key: live map/overlay rendering unverified. Bounds supported by API; automatic viewport-driven queries and polygon hotspots remain incomplete |
-| 6 CMS/public | CRUD/publishing for six typed content modules, sanitized rich text, image uploads, public pages, manual infographic carousel, contact map configuration, contact inbox/trash/restore/delete, account and dispatch management | Rich-text WYSIWYG editor, CMS content restoration UI, advanced search/export layouts |
+| 6 CMS/public | CRUD/publishing for five typed content modules, sanitized rich text, image uploads, public announcement homepage, contact map configuration, contact inbox/trash/restore/delete, and account management | Rich-text WYSIWYG editor, CMS content restoration UI, advanced search/export layouts |
 | 7 Android | Kotlin/Compose, Retrofit to shared API only, Keystore AES/GCM credentials/pending report, register/login/forgot/verification/profile/password/email, fresh foreground location/manual Google pin, accessible explicit send confirmation, exact persisted retry, history/detail/status, configurable FCM adapter | Native profile-photo/incident-attachment UI and offline account editing; physical-device GPS, accessibility and interruptions not exercised |
 | 8 Integration/testing | Backend on MySQL and SQLite, browser against running MySQL app, Android APK, repository unit tests and lint | Android-to-real-server device E2E, live Google Maps/FCM/mail delivery, device UI instrumentation and release signing |
 | 9 Deployment/privacy | Setup scripts, OpenAPI, request examples, permission/state diagrams, threat model and deployment prerequisites | Production FPM/TLS deployment, retention automation/UI, backups/restore, malware scanning, privacy/legal approval and load testing |
@@ -31,7 +31,7 @@ The supplied master specification is the implementation specification; the DOCX 
 
 ## External configuration
 
-All Google Maps/Firebase variable names were checked; required project values are absent. Live Maps, FCM, production mail, Android signing and deployment are not validated. Confirm official emergency numbers before setting contact configuration. New reports route to the category’s linked active agency when its routing setting is enabled; disabled or unavailable routing goes to human triage.
+All Google Maps/Firebase variable names were checked; required project values are absent. Live Maps, FCM, production mail, Android signing and deployment are not validated. Confirm official emergency numbers before setting contact configuration. New reports route to the category’s linked active agency without dispatch-rule settings; unavailable routing goes to human triage.
 
 ## Resume commands
 
@@ -58,7 +58,7 @@ The shared catalog now presents Fire Department (BFP), Police Department (PNP), 
 Both backend database suites passed 17 tests and 136 assertions for this update. The updated code must be deployed and `php artisan migrate --force` run in Laravel Cloud to update production records.
 
 
-## Admin workflow update
+## Admin workflow update (agency-routing module subsequently retired)
 
 Account and content forms show success and reset after a complete successful save, including selected image uploads. Validation or image-upload failures preserve entered values and the saved content ID for retry. Clear Field resets the form; selects return to their placeholder and activation checkboxes return to their initial defaults. An email-delivery failure after account creation returns a clear account-created message with an invitation warning rather than reporting that account creation failed.
 
@@ -67,3 +67,14 @@ Agency dispatch replaces category/coordinate rectangle editing. Migration `2026_
 New audit events snapshot the actor's name and email, the affected account/content/agency label, and allowlisted before/after fields. Content and contact-message removal remain identifiable after deletion. Image replacement, agency edits and routing edits are also logged. The audit page displays names and changes rather than numeric actors and raw JSON. Existing audit entries are preserved; unavailable historical titles or actor snapshots cannot be reconstructed retroactively. Passwords, reset tokens and signed image URLs are excluded from new snapshots.
 
 Validation: backend feature tests cover routing, permissions, audit persistence, form rendering and invitation failure. `node infra/cms-media-smoke.cjs` and `node infra/admin-management-smoke.cjs` exercise browser save/reset behavior with intercepted HTTP; they do not provision a production bucket or send email.
+
+
+## Simplified reports and retired modules
+
+Reports now display Done or Need action and offer Mark as done / Mark as undone, with the same two values in filters. The two-way transition preserves agency permissions, audit and history; changing completion does not change validation. Legacy statuses normalize on read and in filtered queries without rewriting old rows: resolved/closed/rejected/duplicate are Done, and submitted/received/verified/in_progress are Need action. New records use `need_action` and `done`.
+
+The report table and CSV now include location and coordinates. Google Maps/heatmap is separated at `/incident-map`; the dashboard does not request Maps scripts or the deck.gl bundle. Both pages share filters and preserve them when switching views. Existing agency icons remain in the map view.
+
+Dispatch Rules and Infographics are removed from navigation, forms, management APIs and public content routes. Category-to-active-agency routing remains automatic; legacy routing settings are ignored. The homepage displays announcements. Historical rules, infographic rows/files and audit records are retained, not deleted. No schema migration is required for this update.
+
+Validation: 39 backend tests and 492 assertions pass on MySQL and SQLite. Browser checks cover done/undone actions, coordinate display, filters, separate map pins, and absence of Maps requests on the report dashboard. Frontend build passes. Production changes require deploying the updated code/assets; local checks do not claim a live deployment.

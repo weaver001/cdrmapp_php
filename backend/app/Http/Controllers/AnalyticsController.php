@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\IncidentResource;
 use App\Services\IncidentFilters;
+use App\Services\IncidentWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -19,14 +20,14 @@ class AnalyticsController extends Controller
         $this->staff($r);
         $q = $filters->query($r);
 
-        return ['data' => ['total' => (clone $q)->count(), 'by_status' => (clone $q)->selectRaw('workflow_status, COUNT(*) as total')->groupBy('workflow_status')->pluck('total', 'workflow_status'), 'by_agency' => (clone $q)->selectRaw('agency_id, COUNT(*) as total')->groupBy('agency_id')->get(), 'validated' => (clone $q)->where('verification_status', 'validated')->count(), 'latest' => IncidentResource::collection((clone $q)->latest('id')->limit(6)->get())]];
+        return ['data' => ['total' => (clone $q)->count(), 'by_status' => ['done' => (clone $q)->reportStatus('done')->count(), 'need_action' => (clone $q)->reportStatus('need_action')->count()], 'by_agency' => (clone $q)->selectRaw('agency_id, COUNT(*) as total')->groupBy('agency_id')->get(), 'validated' => (clone $q)->where('verification_status', 'validated')->count(), 'latest' => IncidentResource::collection((clone $q)->latest('id')->limit(6)->get())]];
     }
 
     public function heatmap(Request $r, IncidentFilters $filters)
     {
         $this->staff($r);
         $r->validate(['exploratory' => 'nullable|boolean']);
-        $q = $filters->query($r)->where('is_test', false)->whereNotIn('workflow_status', ['rejected', 'duplicate']);
+        $q = $filters->query($r)->where('is_test', false)->whereNotIn('verification_status', ['rejected', 'duplicate'])->whereNotIn('workflow_status', ['rejected', 'duplicate']);
         if (! $r->boolean('exploratory')) {
             $q->where('verification_status', 'validated')->where(fn ($q) => $q->where('location_source', 'manual')->orWhere('accuracy_m', '<=', 100));
         }
@@ -57,9 +58,9 @@ class AnalyticsController extends Controller
             };
             $write(['Created UTC', now()->toISOString(), 'Authorized user ID', $r->user()->id]);
             $write(['Filters', json_encode($r->query())]);
-            $write(['Reference', 'Agency ID', 'Agency', 'Status', 'Received UTC', 'Description']);
+            $write(['Reference', 'Agency ID', 'Agency', 'Status', 'Received UTC', 'Description', 'Location', 'Latitude', 'Longitude']);
             foreach ($q->with('agency')->lazyById(500) as $i) {
-                $write([$i->public_reference, $i->agency_id, $i->agency?->name ?? 'Needs triage', $i->workflow_status, $i->received_at->toISOString(), $i->description]);
+                $write([$i->public_reference, $i->agency_id, $i->agency?->name ?? 'Needs triage', IncidentWorkflow::STATUSES[$i->workflow_status], $i->received_at->toISOString(), $i->description, $i->address, $i->latitude, $i->longitude]);
             }fclose($f);
         }, 'incidents.csv', ['Content-Type' => 'text/csv']);
     }

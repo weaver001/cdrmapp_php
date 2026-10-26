@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agency;
-use App\Models\AgencyDispatchRoute;
 use App\Models\AuditLog;
 use App\Models\DeviceToken;
 use App\Models\IncidentCategory;
@@ -18,32 +17,6 @@ use Illuminate\Validation\Rule;
 
 class ManagementController extends Controller
 {
-    public function dispatchRules()
-    {
-        Gate::authorize('admin');
-
-        return JsonResource::collection(AgencyDispatchRoute::with('agency')->orderBy('id')->paginate(25));
-    }
-
-    public function saveDispatch(Request $r, ?AgencyDispatchRoute $rule = null)
-    {
-        Gate::authorize('admin');
-        $d = $r->validate(['agency_id' => ['required', 'integer', Rule::exists('agencies', 'id')->whereIn('type', array_keys(Agency::DEFAULT_NAMES))], 'active' => 'required|boolean']);
-        $d['agency_id'] = (int) $d['agency_id'];
-        abort_if($rule?->exists && $rule->agency_id !== $d['agency_id'], 422, 'Edit the routing setting for the selected agency.');
-        $rule = DB::transaction(function () use ($d, $r) {
-            $rule = AgencyDispatchRoute::firstOrNew(['agency_id' => $d['agency_id']]);
-            $new = ! $rule->exists;
-            $before = $rule->exists ? $rule->only(['active']) : [];
-            $rule->fill($d)->save();
-            AuditLog::recordChange($r->user(), $new ? 'dispatch.created' : 'dispatch.updated', $rule, $before, $rule->only(['active']), $rule->agency->name);
-
-            return $rule;
-        });
-
-        return ['data' => $rule];
-    }
-
     public function officers(Request $r)
     {
         Gate::authorize('staff');

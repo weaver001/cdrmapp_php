@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Gate;
 
 class ContentController extends Controller
 {
-    public const TYPES = ['announcements', 'infographics', 'services', 'team-members', 'contact-details', 'faqs'];
+    public const TYPES = ['announcements', 'services', 'team-members', 'contact-details', 'faqs'];
 
     private function type(string $type): void
     {
@@ -68,6 +68,7 @@ class ContentController extends Controller
     public function remove(Request $r, string $type, Content $content)
     {
         Gate::authorize('admin');
+        $this->type($type);
         abort_unless($content->type === $type, 404);
         DB::transaction(function () use ($content, $r) {
             $before = $this->snapshot($content);

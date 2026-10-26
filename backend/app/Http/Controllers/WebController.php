@@ -15,7 +15,7 @@ class WebController extends Controller
 {
     public function home()
     {
-        return view('public', ['title' => 'Community preparedness starts with clear information', 'type' => 'infographics', 'items' => Content::where('published', true)->where('type', 'infographics')->latest()->limit(10)->get()]);
+        return view('public', ['title' => 'Community preparedness starts with clear information', 'type' => 'announcements', 'items' => Content::where('published', true)->where('type', 'announcements')->latest()->limit(10)->get()]);
     }
 
     public function page(string $type)
@@ -58,17 +58,22 @@ class WebController extends Controller
         return redirect('/');
     }
 
-    public function dashboard()
+    public function dashboard(bool $mapOnly = false)
     {
         Gate::authorize('staff');
 
-        return view('dashboard', ['agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
+        return view('dashboard', ['mapOnly' => $mapOnly, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
+    }
+
+    public function incidentMap()
+    {
+        return $this->dashboard(true);
     }
 
     public function manage(string $module)
     {
         Gate::authorize('admin');
-        abort_unless(in_array($module, array_merge(ContentController::TYPES, ['users', 'messages', 'agencies', 'audit', 'dispatch-rules']), true), 404);
+        abort_unless(in_array($module, array_merge(ContentController::TYPES, ['users', 'messages', 'agencies', 'audit']), true), 404);
 
         return view('manage', ['module' => $module, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
     }

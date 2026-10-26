@@ -63,7 +63,7 @@ class IncidentController extends Controller
                 $cat = IncidentCategory::findOrFail($d['category_id']);
                 $agencyId = app(Dispatch::class)->agency($cat->id);
                 $i = Incident::create($d + ['reporter_id' => $r->user()->id, 'agency_id' => $agencyId, 'public_reference' => (string) Str::uuid(), 'received_at' => now(), 'request_hash' => $hash]);
-                IncidentStatusHistory::create(['incident_id' => $i->id, 'actor_id' => $r->user()->id, 'new_status' => 'submitted', 'note' => 'Durably received by the server.']);
+                IncidentStatusHistory::create(['incident_id' => $i->id, 'actor_id' => $r->user()->id, 'new_status' => 'need_action', 'note' => 'Durably received by the server.']);
                 AuditLog::recordChange($r->user(), 'incident.created', $i, [], $i->only(['category_id', 'agency_id', 'workflow_status']), $i->public_reference);
                 $flow->notify($i);
 
@@ -91,11 +91,11 @@ class IncidentController extends Controller
     public function status(Request $r, Incident $incident, IncidentWorkflow $flow)
     {
         Gate::authorize('update', $incident);
-        $d = $r->validate(['status' => ['required', Rule::in(array_diff(array_keys(IncidentWorkflow::TRANSITIONS), ['verified']))], 'note' => 'required|string|max:2000']);
+        $d = $r->validate(['status' => ['required', Rule::in(array_keys(IncidentWorkflow::STATUSES))], 'note' => 'nullable|string|max:2000']);
         DB::transaction(function () use ($incident, $r, $flow, $d) {
             $i = Incident::lockForUpdate()->findOrFail($incident->id);
             Gate::authorize('update', $i);
-            $flow->transition($i, $r->user(), $d['status'], $d['note']);
+            $flow->transition($i, $r->user(), $d['status'], $d['note'] ?? ($d['status'] === 'done' ? 'Marked as done.' : 'Marked as undone.'));
         });
 
         return new IncidentResource($incident->fresh());
@@ -109,8 +109,11 @@ class IncidentController extends Controller
             $i = Incident::lockForUpdate()->findOrFail($incident->id);
             Gate::authorize('update', $i);
             abort_if($i->reporter_id === $r->user()->id, 403);
-            $flow->transition($i, $r->user(), 'verified', $d['rationale']);
+            $before = $i->verification_status;
+            $i->update(['verification_status' => 'validated']);
             IncidentVerification::create(['incident_id' => $i->id, 'verified_by' => $r->user()->id, 'outcome' => 'validated', 'rationale' => $d['rationale']]);
+            AuditLog::recordChange($r->user(), 'incident.verified', $i, ['verification_status' => $before], ['verification_status' => 'validated'], $i->public_reference);
+            $flow->notify($i);
         });
 
         return new IncidentResource($incident->fresh());

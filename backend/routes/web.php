@@ -20,6 +20,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/logout', [WebController::class, 'logout']);
     Route::middleware('verified')->group(function () {
         Route::get('/dashboard', [WebController::class, 'dashboard']);
+        Route::get('/incident-map', [WebController::class, 'incidentMap'])->name('incident.map');
         Route::get('/manage/{module}', [WebController::class, 'manage']);
         Route::get('/profile', fn () => view('profile'));
     });

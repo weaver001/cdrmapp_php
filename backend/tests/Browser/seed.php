@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Agency;
-use App\Models\DispatchRule;
 use App\Models\IncidentCategory;
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
@@ -27,7 +26,6 @@ foreach (['admin', 'citizen', 'FIRE', 'PNP'] as $role) {
 }
 $category = IncidentCategory::where('name', Agency::DEFAULT_NAMES['FIRE'])->where('agency_id', Agency::where('type', 'FIRE')->value('id'))->firstOrFail();
 $agency = Agency::where('type', 'FIRE')->first();
-DispatchRule::firstOrCreate(['name' => 'SYNTHETIC browser-only rectangle'], ['category_id' => $category->id, 'agency_id' => $agency->id, 'south' => 14, 'north' => 15, 'west' => 120, 'east' => 122, 'active' => true]);
 file_put_contents($path, json_encode($credentials));
 chmod($path, 0600);
 echo "Local synthetic accounts prepared. Credentials remain in ignored private storage.\n";

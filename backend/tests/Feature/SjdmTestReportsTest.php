@@ -40,13 +40,13 @@ class SjdmTestReportsTest extends TestCase
         $reports->first()->update(['workflow_status' => 'resolved']);
         $this->artisan('cdrmapp:seed-test-reports')->expectsOutputToContain('0 test reports created; 15 already existed')->assertSuccessful();
         $this->assertDatabaseCount('incidents', 15);
-        $this->assertSame('resolved', $reports->first()->fresh()->workflow_status);
+        $this->assertSame('resolved', $reports->first()->fresh()->getRawOriginal('workflow_status'));
         Notification::assertNothingSent();
         Http::assertNothingSent();
         $this->actingAs(User::factory()->create(['role' => 'admin']));
         $this->getJson('/api/v1/analytics/heatmap?exploratory=1')->assertOk()->assertJsonCount(0, 'data.points');
         $this->getJson('/api/v1/incidents')->assertOk()->assertJsonCount(15, 'data');
-        $this->get('/dashboard')->assertOk()->assertSee('Agency pin legend')->assertSee('images/map/fire.svg')->assertSee('images/map/police.svg')->assertSee('images/map/mdrrmo.svg');
+        $this->get('/incident-map')->assertOk()->assertSee('Agency pin legend')->assertSee('images/map/fire.svg')->assertSee('images/map/police.svg')->assertSee('images/map/mdrrmo.svg');
     }
 
     public function test_reserved_reporter_account_is_never_overwritten(): void

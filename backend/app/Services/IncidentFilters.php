@@ -25,7 +25,7 @@ class IncidentFilters
             }
         }
         if (! empty($d['status'])) {
-            $q->where('workflow_status', $d['status']);
+            $q->reportStatus($d['status']);
         }
         if (! empty($d['q'])) {
             $q->where(fn ($q) => $q->where('public_reference', 'like', '%'.$d['q'].'%')->orWhere('description', 'like', '%'.$d['q'].'%'));

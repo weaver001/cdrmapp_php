@@ -9,13 +9,27 @@ use Illuminate\Support\Facades\DB;
 
 class Incident extends Model
 {
+    public const DONE_STATUSES = ['done', 'resolved', 'closed', 'rejected', 'duplicate'];
+
     protected $guarded = [];
 
-    protected $attributes = ['workflow_status' => 'submitted', 'verification_status' => 'unverified', 'is_test' => false];
+    protected $attributes = ['workflow_status' => 'need_action', 'verification_status' => 'unverified', 'is_test' => false];
 
     protected $hidden = ['request_hash', 'idempotency_key'];
 
     protected $casts = ['received_at' => 'datetime', 'incident_at' => 'datetime', 'location_observed_at' => 'datetime', 'latitude' => 'float', 'longitude' => 'float', 'accuracy_m' => 'float', 'is_test' => 'boolean'];
+
+    public function getWorkflowStatusAttribute(?string $value): string
+    {
+        return in_array($value, self::DONE_STATUSES, true) ? 'done' : 'need_action';
+    }
+
+    public function scopeReportStatus(Builder $query, string $status): Builder
+    {
+        return $status === 'done'
+            ? $query->whereIn('workflow_status', self::DONE_STATUSES)
+            : $query->whereNotIn('workflow_status', self::DONE_STATUSES);
+    }
 
     protected static function booted(): void
     {

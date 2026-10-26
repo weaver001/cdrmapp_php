@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Agency;
-use App\Models\AgencyDispatchRoute;
 use App\Models\AuditLog;
 use App\Models\Incident;
 use App\Models\IncidentCategory;
@@ -30,7 +29,6 @@ class IncidentWorkflowTest extends TestCase
         $a = Agency::firstOrCreate(['type' => $type], ['name' => $type]);
 
         $category = IncidentCategory::firstOrCreate(['name' => $type], ['agency_id' => $a->id]);
-        AgencyDispatchRoute::updateOrCreate(['agency_id' => $a->id], ['active' => true]);
 
         return $category;
     }
@@ -45,7 +43,7 @@ class IncidentWorkflowTest extends TestCase
         $citizen = $this->user();
         Sanctum::actingAs($citizen);
         $d = $this->payload();
-        $first = $this->postJson('/api/v1/incidents', $d)->assertCreated()->assertJsonPath('data.workflow_status', 'submitted')->json('data');
+        $first = $this->postJson('/api/v1/incidents', $d)->assertCreated()->assertJsonPath('data.workflow_status', 'need_action')->json('data');
         $this->postJson('/api/v1/incidents', $d)->assertOk()->assertJsonPath('data.id', $first['id']);
         $this->assertDatabaseCount('incidents', 1);
         $audit = AuditLog::where('action', 'incident.created')->sole();
@@ -67,21 +65,18 @@ class IncidentWorkflowTest extends TestCase
         $this->getJson('/api/v1/incidents/'.$first['id'])->assertOk();
     }
 
-    public function test_status_requires_agency_and_valid_transitions_and_records_history(): void
+    public function test_status_requires_agency_and_records_done_undone_without_changing_verification(): void
     {
         Sanctum::actingAs($this->user());
         $id = $this->postJson('/api/v1/incidents', $this->payload())->json('data.id');
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'received', 'note' => 'Test'])->assertForbidden();
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done'])->assertForbidden();
         Sanctum::actingAs($this->user('officer', $this->category()->agency_id));
-        $this->postJson("/api/v1/incidents/$id/verify", ['rationale' => 'Confirmed test event'])->assertUnprocessable();
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'received', 'note' => 'Acknowledged'])->assertOk();
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'verified', 'note' => 'Bypass'])->assertUnprocessable();
-        $this->postJson("/api/v1/incidents/$id/verify", ['rationale' => 'Confirmed test event'])->assertOk()->assertJsonPath('data.verification_status', 'validated');
-        foreach (['in_progress', 'resolved', 'closed'] as $s) {
-            $this->patchJson("/api/v1/incidents/$id/status", ['status' => $s, 'note' => 'Synthetic workflow check'])->assertOk();
-        }
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'received', 'note' => 'Reopen'])->assertUnprocessable();
-        $this->assertDatabaseCount('incident_status_histories', 6);
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done'])->assertOk()->assertJsonPath('data.workflow_status', 'done')->assertJsonPath('data.verification_status', 'unverified');
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done'])->assertOk();
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'need_action'])->assertOk()->assertJsonPath('data.workflow_status', 'need_action');
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'verified'])->assertUnprocessable();
+        $this->postJson("/api/v1/incidents/$id/verify", ['rationale' => 'Confirmed test event'])->assertOk()->assertJsonPath('data.verification_status', 'validated')->assertJsonPath('data.workflow_status', 'need_action');
+        $this->assertDatabaseCount('incident_status_histories', 3);
         $this->assertDatabaseCount('incident_verifications', 1);
     }
 

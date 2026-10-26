@@ -145,7 +145,11 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "need_action",
+                "done"
+              ]
             }
           },
           {
@@ -314,7 +318,11 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "need_action",
+                "done"
+              ]
             }
           },
           {
@@ -1124,7 +1132,11 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "need_action",
+                "done"
+              ]
             }
           },
           {
@@ -1591,7 +1603,11 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "need_action",
+                "done"
+              ]
             }
           },
           {
@@ -2624,26 +2640,23 @@
                   "status": {
                     "type": "string",
                     "enum": [
-                      "received",
-                      "in_progress",
-                      "resolved",
-                      "closed",
-                      "rejected",
-                      "duplicate"
+                      "need_action",
+                      "done"
                     ]
                   },
                   "note": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   }
                 },
                 "required": [
-                  "status",
-                  "note"
+                  "status"
                 ]
               }
             }
           }
-        }
+        },
+        "description": "Authorized staff may mark a report done or need_action. Both directions are supported. A note is optional; history and audit record the acting user. Completion does not validate an incident for the heatmap."
       }
     },
     "/api/v1/incidents/{incident}/verify": {
@@ -3009,7 +3022,6 @@
               "type": "string",
               "enum": [
                 "announcements",
-                "infographics",
                 "services",
                 "team-members",
                 "contact-details",
@@ -3123,7 +3135,6 @@
               "type": "string",
               "enum": [
                 "announcements",
-                "infographics",
                 "services",
                 "team-members",
                 "contact-details",
@@ -3278,7 +3289,6 @@
               "type": "string",
               "enum": [
                 "announcements",
-                "infographics",
                 "services",
                 "team-members",
                 "contact-details",
@@ -3439,7 +3449,6 @@
               "type": "string",
               "enum": [
                 "announcements",
-                "infographics",
                 "services",
                 "team-members",
                 "contact-details",
@@ -3602,7 +3611,6 @@
               "type": "string",
               "enum": [
                 "announcements",
-                "infographics",
                 "services",
                 "team-members",
                 "contact-details",
@@ -3714,306 +3722,6 @@
                 "required": [
                   "image"
                 ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/management/dispatch-rules": {
-      "get": {
-        "summary": "dispatchRules management/dispatch-rules",
-        "operationId": "get_management_dispatch_rules",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Success, including idempotent incident replay. Collections use data and pagination meta/links where paginated.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unverified, inactive, or forbidden scope/role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Idempotency conflict or device ownership conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation or transition error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "description": "Administrator only, except incident assignment operations documented separately. No client-side role checks substitute for server authorization."
-      },
-      "post": {
-        "summary": "saveDispatch management/dispatch-rules",
-        "operationId": "post_management_dispatch_rules",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Success, including idempotent incident replay. Collections use data and pagination meta/links where paginated.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unverified, inactive, or forbidden scope/role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Idempotency conflict or device ownership conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation or transition error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "description": "Administrator only, except incident assignment operations documented separately. No client-side role checks substitute for server authorization.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DispatchRule"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/management/dispatch-rules/{rule}": {
-      "patch": {
-        "summary": "saveDispatch management/dispatch-rules/{rule}",
-        "operationId": "patch_management_dispatch_rules_rule",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "rule",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success, including idempotent incident replay. Collections use data and pagination meta/links where paginated.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unverified, inactive, or forbidden scope/role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Idempotency conflict or device ownership conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation or transition error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "description": "Administrator only, except incident assignment operations documented separately. No client-side role checks substitute for server authorization.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DispatchRule"
               }
             }
           }
@@ -5773,7 +5481,6 @@
               "type": "string",
               "enum": [
                 "announcements",
-                "infographics",
                 "services",
                 "team-members",
                 "contact-details",
@@ -5904,7 +5611,11 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "need_action",
+                "done"
+              ]
             }
           },
           {
@@ -6074,7 +5785,11 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "need_action",
+                "done"
+              ]
             }
           },
           {
@@ -6367,14 +6082,8 @@
           "workflow_status": {
             "type": "string",
             "enum": [
-              "submitted",
-              "received",
-              "verified",
-              "in_progress",
-              "resolved",
-              "closed",
-              "rejected",
-              "duplicate"
+              "need_action",
+              "done"
             ]
           },
           "verification_status": {

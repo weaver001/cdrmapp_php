@@ -18,21 +18,13 @@ Inactive users are rejected by middleware, including previously issued tokens. A
 
 ```mermaid
 stateDiagram-v2
- [*] --> submitted
- submitted --> received
- submitted --> rejected
- submitted --> duplicate
- received --> verified: Authorized verification with rationale
- received --> rejected
- received --> duplicate
- verified --> in_progress
- verified --> rejected
- verified --> duplicate
- in_progress --> resolved
- resolved --> closed
- closed --> [*]
- rejected --> [*]
- duplicate --> [*]
+ [*] --> need_action
+ need_action --> done: Mark as done
+ done --> need_action: Mark as undone
 ```
 
-Verification must use its dedicated endpoint. Status history records actor, timestamp and note; citizen status is read-only. Reopening terminal incidents is deliberately unavailable until an explicit operational policy is supplied.
+Only authorized staff may mark reports done or undone. Status history records actor, timestamp and note; a default action note is recorded when none is supplied. Citizen status is read-only. A repeated request for the current state is a no-op. Completion is separate from verification: marking done does not validate a report for the heatmap. Verification retains its dedicated endpoint and rationale requirement.
+
+Legacy resolved, closed, rejected and duplicate states display/filter as Done; other legacy states display/filter as Need action. Reading old reports does not rewrite stored historical values. New state changes use `done` and `need_action`.
+
+The report dashboard is `/dashboard`; the separately authorized map is `/incident-map`. Dispatch Rules and Infographics management/public endpoints are retired. Historical records remain stored; automatic routing uses the active agency linked to the incident category.

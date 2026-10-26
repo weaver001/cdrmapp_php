@@ -14,6 +14,19 @@ GET {{base}}/incidents
 Authorization: Bearer {{token}}
 Accept: application/json
 
+### Authorized reports needing action (use status=done for completed reports)
+GET {{base}}/reports?status=need_action
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### Mark an authorized report done; use need_action to mark it undone
+PATCH {{base}}/incidents/{{$processEnv CDRMAPP_LOCAL_INCIDENT_ID}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Accept: application/json
+
+{"status":"done"}
+
 ### A synthetic report: preserve the exact UUID/payload for retries
 POST {{base}}/incidents
 Authorization: Bearer {{token}}

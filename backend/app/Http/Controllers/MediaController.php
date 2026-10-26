@@ -23,6 +23,7 @@ class MediaController extends Controller
     public function content(Request $r, string $type, Content $content)
     {
         Gate::authorize('admin');
+        abort_unless(in_array($type, ContentController::TYPES, true), 404);
         abort_unless($content->type === $type, 404);
         $disk = config('filesystems.cms_disk');
         // R2 / Laravel Cloud uses bucket visibility and rejects public ACLs.

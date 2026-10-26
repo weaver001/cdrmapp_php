@@ -13,7 +13,7 @@ The current task validates local development only. A production FPM image, deplo
 
 ## Laravel Cloud: persistent CMS image uploads
 
-Announcement, infographic, service, and team images can use a private Laravel Cloud Object Storage bucket. The application records the disk alongside each image and returns a 30-minute signed `image_url` in public content responses. Reload the page or fetch the API again after a link expires; do not cache content responses or rendered HTML beyond this lifetime. Only published content is returned by public endpoints. Treat signed links as bearer links: someone who receives a link can use it until it expires, even if the item is subsequently unpublished.
+Announcement, service, and team images can use a private Laravel Cloud Object Storage bucket. The application records the disk alongside each image and returns a 30-minute signed `image_url` in public content responses. Reload the page or fetch the API again after a link expires; do not cache content responses or rendered HTML beyond this lifetime. Only published content is returned by public endpoints. Treat signed links as bearer links: someone who receives a link can use it until it expires, even if the item is subsequently unpublished.
 
 1. Deploy the code containing the S3 adapter and image-disk migration. Keep `php artisan migrate --force` in the deployment commands.
 2. Open the application's **production environment** in Laravel Cloud. On its infrastructure canvas, choose **Add bucket**, then create **Laravel Object Storage**. Review the displayed storage costs before creating it.
@@ -33,9 +33,13 @@ The tests validate disk selection, replacement, failed writes, publication filte
 Reference: [Laravel Cloud Object Storage](https://cloud.laravel.com/docs/resources/object-storage).
 
 
-## Admin workflow and agency routing deployment
+## Simplified reports and module removal deployment
 
-Run `php artisan migrate --force` to create and initialize agency routing settings, and rebuild the frontend assets. The new migration enables BFP, PNP and MDRRMO routing by default. Review **Admin → Dispatch rules** after deployment and disable automatic routing for any agency that should require triage. New incidents route by the category's agency without coordinate boundaries; existing incident assignments and legacy rectangle records are preserved. Existing older audit entries remain available, while newly created events include actor and subject snapshots and before/after changes. Forms clear only after complete successful saves; failed image uploads retain the saved item's ID for retry.
+Deploy the updated PHP code and frontend build together. No new database migration is required for this revision. Reports show Done/Need action, with reversible Mark as done/Mark as undone actions. Legacy resolved, closed, rejected and duplicate rows read as Done; other legacy states read as Need action. Historical rows/status history are not bulk-rewritten. CSV now includes status labels and location/coordinates.
+
+Use **Incident dashboard** (`/dashboard`) for reports and **Map & heatmap** (`/incident-map`) for the separate map. Filters are shared and carried across when switching pages. Dispatch Rules and Infographics management/API/public routes are removed. New reports route directly to their category's active agency, ignoring old dispatch settings. Old rule and infographic data remains stored for history/rollback. The public homepage now displays announcements.
+
+Existing audit entries remain available; new changes include actor/subject and before/after details. Forms clear only after complete successful saves; failed image uploads retain the saved item's ID for retry.
 
 ## San Jose del Monte test reports
 
@@ -47,6 +51,6 @@ php artisan cdrmapp:seed-test-reports
 
 It creates exactly five Fire Department (BFP), five Crime / Police Department (PNP), and five MDRRMO reports. Re-running keeps the same fifteen reports without changing their coordinates or workflow state. All are visibly labeled TEST and marked `is_test=true`, so they appear in authorized report lists and map pins but are excluded from both heatmap modes. No email or push notifications are sent. The synthetic reporter is an inactive citizen account at a reserved `.invalid` address; no usable login credentials are produced. Active agencies and linked incident categories must already exist; the command does not modify routing settings or real accounts/reports.
 
-Locations use randomized offsets within fifteen separate cells in the central San Jose del Monte area. Cell corners were checked against the [OpenStreetMap San Jose del Monte administrative boundary](https://www.openstreetmap.org/relation/15662634) (© OpenStreetMap contributors); addresses and events are synthetic and do not identify actual emergencies. The map legend and pins use red flame (BFP), blue police badge (PNP), purple rescue cross (MDRRMO), and a neutral question mark for triage. Pins show the current report page and respect its filters. Clear filters, return to page one, and enable **Show incident pins** to inspect the batch.
+Locations use randomized offsets within fifteen separate cells in the central San Jose del Monte area. Cell corners were checked against the [OpenStreetMap San Jose del Monte administrative boundary](https://www.openstreetmap.org/relation/15662634) (© OpenStreetMap contributors); addresses and events are synthetic and do not identify actual emergencies. The separate map page’s legend and pins use red flame (BFP), blue police badge (PNP), purple rescue cross (MDRRMO), and a neutral question mark for triage. Pins show the current report page and respect its filters. Clear filters, return to page one, and enable **Show incident pins** to inspect the batch.
 
 Checks: `node infra/map-pins-smoke.cjs` intercepts Google Maps and API requests to validate agency/icon mapping, test labels, positions and anchors without real Maps quota. Backend tests validate counts, repeatability, preservation of existing data, heatmap exclusion, and absence of notifications.

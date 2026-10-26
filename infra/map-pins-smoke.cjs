@@ -9,17 +9,20 @@ const assert = require('node:assert/strict');
     try {
         const page = await browser.newPage({ serviceWorkers: 'block' });
         const errors = [];
+        let mapsRequests = 0;
+        const statusWrites = [];
         page.on('pageerror', error => errors.push(error.message));
         const reports = Array.from({ length: 15 }, (_, index) => ({
             id: index + 1, agency: { type: ['FIRE', 'PNP', 'MDRRMO'][Math.floor(index / 5)], name: ['Fire Department (BFP)', 'Police Department (PNP)', 'MDRRMO'][Math.floor(index / 5)] },
             public_reference: `synthetic-${index + 1}`, received_at: '2026-10-26T00:00:00Z',
             latitude: 14.806 + index * 0.001, longitude: 121.039 + index * 0.002,
-            description: '[TEST REPORT] Synthetic map fixture', workflow_status: 'submitted', is_test: true,
+            description: '[TEST REPORT] Synthetic map fixture', workflow_status: 'need_action', is_test: true,
         }));
         reports.push({ ...reports[0], id: 16, agency: null, public_reference: 'synthetic-triage' });
         await page.route('**/*', async route => {
             const url = new URL(route.request().url());
             if (url.hostname === 'maps.googleapis.com') {
+                mapsRequests++;
                 return route.fulfill({ contentType: 'application/javascript', body: `
                     window.__markers = [];
                     window.google = { maps: {
@@ -32,19 +35,30 @@ const assert = require('node:assert/strict');
             }
             assert.equal(url.hostname, 'cdrmapp.test');
             if (url.pathname.endsWith('/map-overlay')) return route.fulfill({ contentType: 'application/javascript', body: 'export class GoogleMapsOverlay {setMap() {} setProps() {}} export class HeatmapLayer {}' });
-            if (url.pathname.endsWith('/summary')) return route.fulfill({ json: { data: { total: 16, by_status: { submitted: 16 }, validated: 0 } } });
-            if (url.pathname.endsWith('/incidents')) return route.fulfill({ json: { data: reports, meta: { last_page: 1 } } });
+            if (url.pathname.endsWith('/status')) {
+                const body = route.request().postDataJSON();
+                assert.deepEqual(Object.keys(body), ['status']);
+                assert.ok(['done', 'need_action'].includes(body.status));
+                statusWrites.push(body.status);
+                const report = reports.find(item => item.id === Number(url.pathname.split('/').at(-2)));
+                report.workflow_status = body.status;
+                return route.fulfill({ json: { data: report } });
+            }
+            if (url.pathname.endsWith('/summary')) return route.fulfill({ json: { data: { total: 16, by_status: { need_action: reports.filter(report => report.workflow_status === 'need_action').length, done: reports.filter(report => report.workflow_status === 'done').length }, validated: 0 } } });
+            if (url.pathname.endsWith('/incidents')) return route.fulfill({ json: { data: reports.filter(report => !url.searchParams.get('status') || report.workflow_status === url.searchParams.get('status')), meta: { last_page: 1 } } });
             if (url.pathname.endsWith('/notifications')) return route.fulfill({ json: { data: [], meta: { total: 0 } } });
             if (url.pathname.endsWith('/heatmap')) return route.fulfill({ json: { data: { points: [], exploratory: false } } });
+            const mapView = url.pathname === '/incident-map';
             return route.fulfill({ contentType: 'text/html', body: `<meta name="csrf-token" content="synthetic">
-                <div id="dashboard" data-map-key="synthetic" data-role="admin">
-                <form id="filters"></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
-                <table><tbody id="incidents"></tbody></table><span id="page"></span><button id="previous"></button><button id="next"></button>
-                <a id="export"></a><button id="print"></button><button id="refresh"></button>
+                <div id="dashboard" ${mapView ? 'data-map-key="synthetic"' : ''} data-role="admin">
+                <form id="filters"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
+                <span id="page"></span><button id="previous"></button><button id="next"></button>
+                <a id="switch-view" href="${mapView ? '/dashboard' : '/incident-map'}"></a><a id="export"></a><button id="print"></button><button id="refresh"></button>
+                ${mapView ? `
                 <input type="checkbox" id="show-pins" checked><input type="checkbox" id="exploratory">
-                <p id="map-status"></p><div id="map"></div></div>` });
+                <p id="map-status"></p><div id="map"></div>` : '<table><tbody id="incidents"></tbody></table>'}</div>` });
         });
-        await page.goto('http://cdrmapp.test/dashboard');
+        await page.goto('http://cdrmapp.test/incident-map');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
         await page.waitForFunction(() => window.__markers?.length === 16);
         const markers = await page.evaluate(() => window.__markers.map(marker => ({
@@ -65,8 +79,27 @@ const assert = require('node:assert/strict');
             assert.ok(fs.existsSync(path.join(__dirname, `../backend/public/images/map/${file}.svg`)));
         }
         assert.equal(markers.find(marker => marker.title.endsWith('synthetic-triage')).icon, '/images/map/triage.svg');
+        const mapLoads = mapsRequests;
+        await page.goto('http://cdrmapp.test/dashboard');
+        await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
+        await page.locator('#incidents tr').first().waitFor();
+        assert.equal(await page.locator('#incidents tr').count(), 16);
+        assert.ok((await page.locator('#incidents tr').first().textContent()).includes('Latitude: 14.806000 · Longitude: 121.039000'));
+        await page.getByRole('button', { name: 'Mark as done', exact: true }).first().click();
+        await page.getByRole('button', { name: 'Mark as undone', exact: true }).waitFor();
+        assert.equal(await page.locator('#incidents tr').first().locator('td').nth(4).textContent(), 'Done');
+        await page.getByRole('button', { name: 'Mark as undone', exact: true }).click();
+        await page.waitForFunction(() => document.querySelectorAll('#incidents button').length === 32 && !document.querySelector('#incidents').textContent.includes('Mark as undone'));
+        assert.deepEqual(statusWrites, ['done', 'need_action']);
+        assert.equal(mapsRequests, mapLoads, 'The report dashboard must not load Google Maps.');
+        assert.equal(await page.evaluate(() => typeof window.google), 'undefined');
+        await page.locator('[name=status]').selectOption('done');
+        await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+        await page.getByText('No reports match these filters.', { exact: true }).waitFor();
+        assert.equal(await page.locator('#incidents td').getAttribute('colspan'), '6');
+        assert.equal(new URL(await page.locator('#switch-view').getAttribute('href'), 'http://cdrmapp.test').searchParams.get('status'), 'done');
         assert.deepEqual(errors, []);
-        console.log('PASS: five flame pins, five police-badge pins, five rescue-cross pins, neutral triage fallback, test labels, exact coordinates, and pin anchors.');
+        console.log('PASS: agency pins on the separate map page; dashboard coordinates, Done/Need action actions and filtering; no Google Maps requests from the report table.');
     } finally {
         await browser.close();
     }

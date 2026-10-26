@@ -45,9 +45,6 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
             Route::get('analytics/trends', [AnalyticsController::class, 'trends']);
             Route::get('reports', [IncidentController::class, 'index'])->middleware('can:staff');
             Route::get('reports/export', [AnalyticsController::class, 'export']);
-            Route::get('management/dispatch-rules', [ManagementController::class, 'dispatchRules']);
-            Route::post('management/dispatch-rules', [ManagementController::class, 'saveDispatch']);
-            Route::patch('management/dispatch-rules/{rule}', [ManagementController::class, 'saveDispatch']);
             Route::get('management/users', [ManagementController::class, 'users']);
             Route::post('management/users', [ManagementController::class, 'saveUser']);
             Route::patch('management/users/{user}', [ManagementController::class, 'saveUser']);

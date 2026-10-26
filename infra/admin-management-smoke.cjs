@@ -76,22 +76,6 @@ const form = (module, fields, label) => `<form id="editor" data-endpoint="/api/v
         await users.getByText('Please wait before retrying.', { exact: true }).waitFor();
         assert.deepEqual(popups, ['Success'], 'Failed reset requests must not show a success popup.');
 
-        let routing = { id: 3, agency_id: 8, agency: { name: 'MDRRMO' }, active: true };
-        const routes = await open('dispatch-rules', shell('dispatch-rules', form('dispatch-rules', '<select name="agency_id" required><option value="">Select agency</option><option value="8">MDRRMO</option></select><input type="checkbox" name="active" checked>', 'Save routing')), async route => {
-            const request = route.request();
-            if (request.method() === 'GET') return route.fulfill({ json: { data: [routing], last_page: 1 } });
-            assert.equal(request.method(), 'POST');
-            assert.deepEqual(Object.keys(request.postDataJSON()).sort(), ['active', 'agency_id']);
-            routing = { ...routing, ...request.postDataJSON() };
-            return route.fulfill({ json: { data: routing } });
-        });
-        await routes.getByRole('button', { name: 'Edit routing', exact: true }).click();
-        await routes.locator('[name=active]').uncheck();
-        await routes.getByRole('button', { name: 'Save routing', exact: true }).click();
-        await routes.getByText('Agency routing saved successfully.', { exact: true }).waitFor();
-        await routes.getByText('Automatic routing disabled — reports go to triage', { exact: true }).waitFor();
-        assert.equal(await routes.locator('[name=agency_id]').inputValue(), '');
-
         const audit = await open('audit', shell('audit'), route => route.fulfill({ json: { data: [{
             id: 1, action: 'content.deleted', actor_name: 'Synthetic Administrator', record_label: 'Community readiness notice', created_at: '2026-10-22T12:00:00Z',
             metadata: { before: { title: 'Community readiness notice', body: '<script>window.auditInjected=true</script>' }, after: {} },
@@ -102,7 +86,7 @@ const form = (module, fields, label) => `<form id="editor" data-endpoint="/api/v
         assert.ok((await audit.locator('#records').textContent()).includes('<script>window.auditInjected=true</script> → None'));
         assert.equal(await audit.evaluate(() => window.auditInjected), undefined);
         assert.deepEqual(errors, []);
-        console.log('PASS: account create/edit success and clearing, failed save preservation, Clear Field, agency-only routing, and readable audit actor/subject/changes with safe rendering.');
+        console.log('PASS: account create/edit success and clearing, failed save preservation, Clear Field, reset success popup, and readable audit actor/subject/changes with safe rendering.');
     } finally {
         await browser.close();
     }

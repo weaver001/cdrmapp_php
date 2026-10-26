@@ -34,10 +34,9 @@ class AuditManagementTest extends TestCase
     public function test_admin_forms_have_clear_buttons_and_simple_agency_routing(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']));
-        foreach (['users', 'announcements', 'infographics', 'services', 'team-members', 'contact-details', 'faqs', 'dispatch-rules'] as $module) {
+        foreach (['users', 'announcements', 'services', 'team-members', 'contact-details', 'faqs'] as $module) {
             $this->get('/manage/'.$module)->assertOk()->assertSee('Clear Field')->assertDontSee('New item')->assertDontSee('New account');
         }
-        $this->get('/manage/dispatch-rules')->assertSee('Fire Department (BFP)')->assertSee('Police Department (PNP)')->assertSee('MDRRMO')->assertDontSee('Rule name')->assertDontSee('name="south"', false);
     }
 
     public function test_audit_identifies_actor_and_content_after_update_and_removal(): void

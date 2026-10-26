@@ -25,6 +25,7 @@ const node = (tag, text, className) => { const n = document.createElement(tag); 
 const button = (text, action) => { const b = node('button', text, 'btn-secondary'); b.type = 'button'; b.addEventListener('click', action); return b; };
 const date = value => new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' }).format(new Date(value));
 const statusLabel = value => value.replaceAll('_', ' ');
+const reportStatusLabel = value => value === 'done' ? 'Done' : 'Need action';
 const formBody = form => {
     const data = Object.fromEntries(new FormData(form));
     for (const input of form.querySelectorAll('input[type=checkbox]')) data[input.name] = input.checked;
@@ -40,9 +41,13 @@ for (const form of document.querySelectorAll('.api-form')) form.addEventListener
 const dashboard = document.querySelector('#dashboard');
 if (dashboard) {
     const filters = document.querySelector('#filters'); const message = document.querySelector('#dashboard-status');
+    const mapView = !!document.querySelector('#map');
+    const initialFilters = new URLSearchParams(window.location.search);
+    for (const field of filters.elements) if (field.name && initialFilters.has(field.name)) field.value = initialFilters.get(field.name);
     let page = 1, lastPage = 1, busy = false, map, overlay, HeatmapLayerClass, markers = [], latest = [], mapsPromise;
     const params = () => new URLSearchParams([...new FormData(filters)].filter(([, value]) => value));
     async function ensureMap() {
+        if (!mapView) return false;
         if (!dashboard.dataset.mapKey) { document.querySelector('#map-status').textContent = 'Google Maps is not configured. Set GOOGLE_MAPS_WEB_KEY with a restricted web API key.'; return; }
         if (!mapsPromise) mapsPromise = new Promise((resolve, reject) => {
             const script = document.createElement('script');
@@ -72,16 +77,16 @@ if (dashboard) {
         document.querySelector('#map-status').textContent = `${result.data.points.length} eligible density cells. ${result.data.exploratory ? 'Exploratory view includes unverified and uncertain locations.' : 'Validated incidents only.'}`;
     }
     async function action(id, operation) {
-        const note = prompt('Enter an operational note (required):'); if (!note) return;
         try {
-            const verify = operation === 'verified';
-            await api(`/api/v1/incidents/${id}/${verify ? 'verify' : 'status'}`, verify ? 'POST' : 'PATCH', verify ? { rationale: note } : { status: operation, note });
+            await api(`/api/v1/incidents/${id}/status`, 'PATCH', { status: operation });
             await load();
+            if (document.querySelector('#incident-detail')?.open) await detail(id);
         } catch (e) { message.textContent = e.message; }
     }
     async function detail(id) {
         try {
             const { data: i } = await api(`/api/v1/incidents/${id}`); const body = document.querySelector('#detail-body'); body.replaceChildren(node('h2', i.public_reference, 'text-xl font-bold'), node('p', i.description, 'my-4 whitespace-pre-line'), node('p', `${i.latitude}, ${i.longitude} · ${i.location_source} · accuracy: ${i.accuracy_m ?? 'not measured'} m`), node('p', `Reporter: ${i.reporter?.name || 'restricted'} · ${i.address || 'No address supplied'}`), node('h3', 'Status history', 'font-bold mt-5'));
+            body.append(node('p', `Status: ${reportStatusLabel(i.workflow_status)}`, 'font-semibold my-3'), button(i.workflow_status === 'done' ? 'Mark as undone' : 'Mark as done', () => action(i.id, i.workflow_status === 'done' ? 'need_action' : 'done')));
             for (const h of i.histories || []) body.append(node('p', `${date(h.created_at)} · ${statusLabel(h.new_status)} · ${h.note || ''}`, 'mt-2'));
             for (const attachment of i.attachments || []) { const a=node('a',`Download incident image ${attachment.id}`,'block underline my-2');a.href=`/api/v1/incidents/${i.id}/attachments/${attachment.id}`;body.append(a); }
             body.append(node('h3', 'Response notes', 'font-bold mt-5'));
@@ -105,18 +110,21 @@ if (dashboard) {
             const p = params(); p.set('page', page);
             const [summary, incidents, notifications] = await Promise.all([api(`/api/v1/dashboard/summary?${p}`), api(`/api/v1/incidents?${p}`), api('/api/v1/notifications')]);
             const cards = document.querySelector('#summary'); cards.replaceChildren();
-            for (const [label, value] of [['Received reports', summary.data.total], ['Awaiting action', (summary.data.by_status.submitted || 0) + (summary.data.by_status.received || 0)], ['In progress', summary.data.by_status.in_progress || 0], ['Validated', summary.data.validated]]) { const card = node('div', null, 'panel'); card.append(node('p', label, 'text-sm text-slate-600'), node('p', String(value), 'text-3xl font-bold mt-2')); cards.append(card); }
+            for (const [label, value] of [['Reports', summary.data.total], ['Need action', summary.data.by_status.need_action || 0], ['Done', summary.data.by_status.done || 0]]) { const card = node('div', null, 'panel'); card.append(node('p', label, 'text-sm text-slate-600'), node('p', String(value), 'text-3xl font-bold mt-2')); cards.append(card); }
             document.querySelector('#unread').textContent = `${notifications.meta?.total ?? notifications.total ?? notifications.data.length} unread notifications`;
-            const rows = document.querySelector('#incidents'); rows.replaceChildren(); latest = incidents.data;
-            if (!latest.length) { const tr = node('tr'); const td = node('td', 'No reports match these filters.'); td.colSpan = 5; tr.append(td); rows.append(tr); }
-            const transitions = { submitted: ['received', 'rejected', 'duplicate'], received: ['verified', 'rejected', 'duplicate'], verified: ['in_progress'], in_progress: ['resolved'], resolved: ['closed'] };
-            for (const i of latest) {
+            const rows = document.querySelector('#incidents'); rows?.replaceChildren(); latest = incidents.data;
+            if (rows && !latest.length) { const tr = node('tr'); const td = node('td', 'No reports match these filters.'); td.colSpan = 6; tr.append(td); rows.append(tr); }
+            if (rows) for (const i of latest) {
                 const tr = node('tr'); const ref = node('td'); ref.append(button(i.public_reference.slice(0, 8), () => detail(i.id)), node('p', date(i.received_at), 'text-xs mt-2'));
-                const actions = node('td'); for (const next of transitions[i.workflow_status] || []) actions.append(button(statusLabel(next), () => action(i.id, next)));
-                tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), node('td', statusLabel(i.workflow_status)), actions); rows.append(tr);
+                const actions = node('td'); actions.append(button(i.workflow_status === 'done' ? 'Mark as undone' : 'Mark as done', () => action(i.id, i.workflow_status === 'done' ? 'need_action' : 'done')));
+                const location = node('td'); if (i.address) location.append(node('p', i.address));
+                location.append(node('p', `Latitude: ${Number(i.latitude).toFixed(6)} · Longitude: ${Number(i.longitude).toFixed(6)}`, 'text-sm'));
+                tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), location, node('td', reportStatusLabel(i.workflow_status)), actions); rows.append(tr);
             }
             lastPage = incidents.meta.last_page; document.querySelector('#page').textContent = `Page ${page} of ${lastPage}`; document.querySelector('#previous').disabled = page <= 1; document.querySelector('#next').disabled = page >= lastPage;
             document.querySelector('#export').href = `/api/v1/reports/export?${params()}`;
+            const switchView = document.querySelector('#switch-view');
+            if (switchView) switchView.href = `${new URL(switchView.href).pathname}?${params()}`;
             message.textContent = `Updated ${date(new Date())}. Refreshes every 15 seconds while visible.`;
             await updateMap();
         } catch (e) { message.textContent = `Could not refresh: ${e.message}. Existing information may be stale.`; } finally { busy = false; }
@@ -124,13 +132,13 @@ if (dashboard) {
     filters.addEventListener('submit', e => { e.preventDefault(); page = 1; load(); });
     document.querySelector('#refresh').onclick = load; document.querySelector('#print').onclick = () => window.print();
     document.querySelector('#previous').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#next').onclick = () => { if (page < lastPage) { page++; load(); } };
-    for (const id of ['exploratory', 'show-pins']) document.querySelector(`#${id}`).onchange = () => updateMap().catch(e => { document.querySelector('#map-status').textContent = e.message; });
+    for (const id of ['exploratory', 'show-pins']) document.querySelector(`#${id}`)?.addEventListener('change', () => updateMap().catch(e => { document.querySelector('#map-status').textContent = e.message; }));
     setInterval(() => { if (!document.hidden) load(); }, 15000); document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); }); load();
 }
 const management = document.querySelector('#management');
 if (management) {
     const module = management.dataset.module; const editor = document.querySelector('#editor'); const message = document.querySelector('#form-status');
-    const content = !['users', 'messages', 'agencies', 'audit','dispatch-rules'].includes(module); let page = 1, last = 1;
+    const content = !['users', 'messages', 'agencies', 'audit'].includes(module); let page = 1, last = 1;
     const endpoint = content ? `/api/v1/management/content/${module}` : module === 'agencies' ? '/api/v1/agencies' : `/api/v1/management/${module}`;
     const auditActions = {
         'user.created': 'Added account', 'user.updated': 'Updated account', 'user.saved': 'Saved account',
@@ -138,7 +146,7 @@ if (management) {
         'content.deleted': 'Removed content', 'content.image_updated': 'Updated content image',
         'agency.updated': 'Updated agency', 'dispatch.created': 'Added agency routing', 'dispatch.updated': 'Updated agency routing', 'dispatch.saved': 'Saved dispatch rule',
         'message.trash': 'Removed contact message', 'message.restore': 'Restored contact message', 'message.destroy': 'Permanently deleted contact message',
-        'incident.created': 'Added incident report', 'incident.test_created': 'Added test incident report', 'incident.status': 'Changed incident status', 'incident.assignment': 'Changed incident assignment',
+        'incident.created': 'Added incident report', 'incident.test_created': 'Added test incident report', 'incident.status': 'Changed incident status', 'incident.verified': 'Verified incident report', 'incident.assignment': 'Changed incident assignment',
     };
     const auditValue = value => value == null ? 'None' : typeof value === 'boolean' ? (value ? 'Yes' : 'No') : typeof value === 'object' ? Object.entries(value).map(([key, item]) => `${statusLabel(key)}: ${auditValue(item)}`).join('; ') : String(value);
     async function mutate(path, method, data, successPopup = false) {
@@ -153,7 +161,7 @@ if (management) {
         try {
             const result = await api(`${endpoint}?page=${page}&trash=${document.querySelector('#trash')?.checked ? 1 : 0}`); const list = document.querySelector('#records'); list.replaceChildren();
             for (const item of result.data) {
-                const card = node('article', null, 'panel'); card.append(node('h2', module === 'audit' ? (auditActions[item.action] || statusLabel(item.action)) : module === 'dispatch-rules' ? item.agency?.name : item.title || item.name || item.action, 'font-semibold text-lg'));
+                const card = node('article', null, 'panel'); card.append(node('h2', module === 'audit' ? (auditActions[item.action] || statusLabel(item.action)) : item.title || item.name || item.action, 'font-semibold text-lg'));
                 if (module === 'audit') {
                     card.append(node('p', item.record_label || `${item.record_type} #${item.record_id}`, 'font-semibold mt-2'));
                     card.append(node('p', `By ${item.actor_name || item.actor?.name || 'Unknown user'} · ${date(item.created_at)}`, 'text-sm my-2'));
@@ -169,10 +177,6 @@ if (management) {
                         for (const [key, value] of Object.entries(metadata)) details.append(node('dt', statusLabel(key), 'font-semibold'), node('dd', auditValue(value)));
                     }
                     card.append(details);
-                }
-                else if (module === 'dispatch-rules') {
-                    card.append(node('p', item.active ? 'Automatic routing enabled' : 'Automatic routing disabled — reports go to triage', 'my-3'));
-                    card.append(button('Edit routing', () => { editor.elements.agency_id.value = item.agency_id; editor.elements.active.checked = item.active; editor.scrollIntoView({ behavior: 'smooth' }); }));
                 }
                 else if (module === 'agencies') {
                     card.append(node('p', `${item.type === 'FIRE' ? 'BFP' : item.type} · ${item.jurisdiction || 'Jurisdiction not configured'} · ${item.emergency_phone || 'No emergency number configured'}`));
@@ -208,7 +212,7 @@ if (management) {
     editor?.addEventListener('submit', async e => {
         e.preventDefault();
         if (saving) return;
-        const id = module === 'dispatch-rules' ? '' : editor.elements.id.value;
+        const id = editor.elements.id.value;
         const file = content ? editor.elements.namedItem('image')?.files?.[0] : null;
         const body = formBody(editor);
         const fields = [...editor.elements].map(field => [field, field.disabled]);
@@ -230,7 +234,7 @@ if (management) {
             }
             editor.reset();
             editor.elements.id.value = '';
-            message.textContent = result.message || (file ? 'Content and image saved successfully.' : content ? 'Content saved successfully.' : module === 'users' ? 'Account saved successfully.' : 'Agency routing saved successfully.');
+            message.textContent = result.message || (file ? 'Content and image saved successfully.' : content ? 'Content saved successfully.' : module === 'users' ? 'Account saved successfully.' : 'Saved successfully.');
             await load();
         } catch (error) {
             message.textContent = contentSaved ? `Content saved, but image upload failed: ${error.message}` : error.message;
@@ -244,7 +248,5 @@ if (management) {
     document.querySelector('#manage-prev').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#manage-next').onclick = () => { if (page < last) { page++; load(); } }; load();
 }
 
-const carousel=document.querySelector('[data-carousel]');
-if(carousel){const cards=[...carousel.querySelectorAll('article')];let current=0;const show=()=>cards.forEach((card,i)=>{card.hidden=i!==current;});if(cards.length>1){const controls=node('div',null,'flex gap-3 mb-4');controls.append(button('Previous infographic',()=>{current=(current+cards.length-1)%cards.length;show();}),button('Next infographic',()=>{current=(current+1)%cards.length;show();}));carousel.before(controls);show();}}
 const publicMap=document.querySelector('[data-contact-map]');
 if(publicMap?.dataset.key){window.cdrmPublicMapReady=()=>{const position={lat:Number(publicMap.dataset.latitude),lng:Number(publicMap.dataset.longitude)};const map=new google.maps.Map(publicMap,{center:position,zoom:14});new google.maps.Marker({map,position,title:'Official contact location'});};const script=document.createElement('script');const url=new URL('https://maps.googleapis.com/maps/api/js');url.searchParams.set('key',publicMap.dataset.key);url.searchParams.set('callback','cdrmPublicMapReady');url.searchParams.set('loading','async');script.src=url;script.onerror=()=>{publicMap.textContent='Map could not load. Please use the published contact address.';};document.head.append(script);}
