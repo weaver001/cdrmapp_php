@@ -7,6 +7,7 @@ import org.cdrmapp.citizen.BuildConfig
 import java.util.concurrent.TimeUnit
 
 class SessionStorageException : IllegalStateException("Could not persist the secure session.")
+class InvalidCredentialsException : IllegalArgumentException("Incorrect Username/Password")
 
 class Repository(private val store: SecretStorage, baseUrl: String = BuildConfig.API_BASE_URL, private val diagnostic: (String) -> Unit = {}) {
  private val gson = Gson()
@@ -23,7 +24,12 @@ class Repository(private val store: SecretStorage, baseUrl: String = BuildConfig
  val api: CdrmApi = Retrofit.Builder().baseUrl(baseUrl).client(client).addConverterFactory(GsonConverterFactory.create(gson)).build().create(CdrmApi::class.java)
  fun hasSession() = store.get("token") != null
  suspend fun login(email: String, password: String): Citizen {
-  val result = api.login(mapOf("email" to email, "password" to password, "device_name" to "Android citizen")).data
+  val result = try {
+   api.login(mapOf("email" to email, "password" to password, "device_name" to "Android citizen")).data
+  } catch (e: retrofit2.HttpException) {
+   if (e.code() == 401 || e.code() == 422) throw InvalidCredentialsException()
+   throw e
+  }
   require(result.user.id > 0 && result.token.isNotBlank())
   try {
    store.put("token", result.token); store.put("user_id", result.user.id.toString())

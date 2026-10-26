@@ -5,6 +5,9 @@
  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
  <application android:name=".CitizenApplication" android:label="CDRMAPP" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="${cleartextAllowed}" android:theme="@style/Theme.CDRMAPP">
   <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
+  <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="incident-status" />
+  <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_cdrmapp" />
+  <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/cdrm_green" />
   <service android:name=".push.CitizenMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>
   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
  </application>

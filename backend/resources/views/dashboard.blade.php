@@ -41,7 +41,7 @@
     @else
         <section class="panel overflow-x-auto">
             <h2 class="text-xl font-semibold mb-3">Response watchlist</h2>
-            <table><thead><tr><th>Reference / received</th><th>Incident</th><th>Agency</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody id="incidents"></tbody></table>
+            <table><thead><tr><th>Reference / received</th><th>Incident</th><th>Agency</th><th>Location</th><th>Status</th><th>View on map</th><th>Actions</th></tr></thead><tbody id="incidents"></tbody></table>
         </section>
     @endif
     <div class="flex gap-4 mt-4"><button id="previous" class="btn-secondary">Previous</button><span id="page" class="self-center"></span><button id="next" class="btn-secondary">Next</button></div>

@@ -7,6 +7,8 @@ use App\Models\Content;
 use App\Models\Incident;
 use App\Models\IncidentCategory;
 use App\Models\User;
+use App\Notifications\Channels\FcmChannel;
+use App\Notifications\IncidentChanged;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -64,15 +66,37 @@ class ReportDashboardTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_marking_a_real_report_done_notifies_its_reporter_and_updates_their_history(): void
+    {
+        Notification::fake();
+        config(['services.fcm.enabled' => true]);
+        $incident = $this->report('need_action');
+        $incident->update(['is_test' => false]);
+        $reporter = $incident->reporter;
+        $otherCitizen = User::factory()->create();
+        Sanctum::actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => $incident->agency_id]));
+        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done'])->assertOk();
+        Notification::assertSentTo($reporter, IncidentChanged::class, fn ($n, $channels) => $n->status === 'done'
+            && $n->incidentId === $incident->id
+            && in_array(FcmChannel::class, $channels, true));
+        Notification::assertNotSentTo($otherCitizen, IncidentChanged::class);
+        Sanctum::actingAs($reporter);
+        $this->getJson('/api/v1/incidents')->assertOk()->assertJsonPath('data.0.workflow_status', 'done');
+        $this->getJson('/api/v1/incidents/'.$incident->id)->assertOk()->assertJsonPath('data.workflow_status', 'done');
+    }
+
     public function test_map_is_a_separate_authorized_page_and_dashboard_has_location_and_two_statuses(): void
     {
         $this->get('/incident-map')->assertRedirect('/login');
         $this->actingAs(User::factory()->create(['role' => 'admin']));
         $this->get('/dashboard')->assertOk()->assertSee('<th>Location</th>', false)
+            ->assertSee('<th>View on map</th>', false)
             ->assertSee('value="done"', false)->assertSee('value="need_action"', false)
             ->assertDontSee('id="map"', false)->assertDontSee('data-map-key', false)
             ->assertDontSee('/manage/dispatch-rules')->assertDontSee('/manage/infographics');
         $this->get('/incident-map')->assertOk()->assertSee('id="map"', false)->assertDontSee('id="incidents"', false)->assertSee('Agency pin legend');
+        $this->actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => Agency::where('type', 'FIRE')->value('id')]));
+        $this->get('/dashboard')->assertOk()->assertSee('<th>View on map</th>', false);
         $this->actingAs(User::factory()->create());
         $this->get('/incident-map')->assertForbidden();
     }

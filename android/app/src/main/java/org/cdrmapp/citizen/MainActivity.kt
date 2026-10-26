@@ -19,6 +19,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -33,6 +36,9 @@ import org.cdrmapp.citizen.ui.CitizenViewModel
 import org.cdrmapp.citizen.ui.theme.BrandGold
 import org.cdrmapp.citizen.ui.theme.BrandGreen
 import org.cdrmapp.citizen.ui.theme.CdrmTheme
+import org.cdrmapp.citizen.push.PushRegistration
+import org.cdrmapp.citizen.push.PushRegistrationState
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -79,8 +85,14 @@ class MainActivity : ComponentActivity() {
    return
   }
   if (BuildConfig.FIREBASE_APPLICATION_ID.isNotBlank()) {
-   val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-   if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) TextButton(onClick = { notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text("Enable status notifications") }
+   var permissionGranted by remember { mutableStateOf(android.os.Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
+   val pushState by PushRegistration.state.collectAsStateWithLifecycle()
+   val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> permissionGranted = granted; if (granted) PushRegistration.register(this) }
+   if (!permissionGranted) TextButton(onClick = { notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text("Enable status notifications") }
+   if (pushState == PushRegistrationState.Failed) {
+    Text("Status notifications could not be registered. Check your connection and retry.")
+    TextButton(onClick = { PushRegistration.register(this) }) { Text("Retry notifications") }
+   }
   }
   when(tab) { "Report" -> ReportScreen(vm, state); "History" -> HistoryScreen(vm, state); else -> ProfileScreen(vm, state) }
  }
@@ -163,14 +175,20 @@ class MainActivity : ComponentActivity() {
 @Composable private fun Field(label: String, value: String, changed: (String) -> Unit) { OutlinedTextField(value = value, onValueChange = changed, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
 @Composable private fun PasswordField(label: String, value: String, changed: (String) -> Unit) { OutlinedTextField(value = value, onValueChange = changed, label = { Text(label) }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true) }
 @Composable private fun HistoryScreen(vm: CitizenViewModel, state: CitizenState) {
+ val lifecycleOwner = LocalLifecycleOwner.current
+ LaunchedEffect(lifecycleOwner, vm) {
+  lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+   while (true) { vm.refreshHistory(); delay(15_000) }
+  }
+ }
  Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
   Text("Your incident history", style = MaterialTheme.typography.headlineSmall)
-  OutlinedButton(onClick = vm::refresh, enabled = !state.busy) { Text("Refresh status") }
+  OutlinedButton(onClick = vm::refreshHistory, enabled = !state.busy) { Text("Refresh status") }
   if (state.incidents.isEmpty()) Text("No reports received by the server yet.")
-  for (incident in state.incidents) Card(onClick = { vm.detail(incident.id) }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(incident.reference, style = MaterialTheme.typography.titleSmall); Text(incident.description); Text("${incident.status.replace('_',' ')} · ${localTime(incident.receivedAt)}") } }
+  for (incident in state.incidents) Card(onClick = { vm.detail(incident.id) }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(incident.reference, style = MaterialTheme.typography.titleSmall); Text(incident.description); Text("${reportStatus(incident.status)} · ${localTime(incident.receivedAt)}") } }
   Row { TextButton(onClick = { vm.page(state.page - 1) }, enabled = !state.busy && state.page > 1) { Text("Previous") }; Text("${state.page} / ${state.lastPage}", Modifier.padding(12.dp)); TextButton(onClick = { vm.page(state.page + 1) }, enabled = !state.busy && state.page < state.lastPage) { Text("Next") } }
  }
- state.detail?.let { incident -> AlertDialog(onDismissRequest = vm::closeDetail, title = { Text(incident.reference) }, text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(incident.description); Text("Status: ${incident.status}"); for (h in incident.histories.orEmpty()) Text("${localTime(h.at)} · ${h.status} · ${h.note.orEmpty()}", Modifier.padding(top = 12.dp)) } }, confirmButton = { TextButton(onClick = vm::closeDetail) { Text("Close") } }) }
+ state.detail?.let { incident -> AlertDialog(onDismissRequest = vm::closeDetail, title = { Text(incident.reference) }, text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(incident.description); Text("Status: ${reportStatus(incident.status)}"); for (h in incident.histories.orEmpty()) Text("${localTime(h.at)} · ${reportStatus(h.status)} · ${h.note.orEmpty()}", Modifier.padding(top = 12.dp)) } }, confirmButton = { TextButton(onClick = vm::closeDetail) { Text("Close") } }) }
 }
 @Composable private fun ProfileScreen(vm: CitizenViewModel, state: CitizenState) {
  var name by remember(state.user?.name) { mutableStateOf(state.user?.name.orEmpty()) }; var dob by remember { mutableStateOf(state.user?.dateOfBirth.orEmpty()) }; var email by remember { mutableStateOf("") }; var current by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
@@ -183,4 +201,5 @@ class MainActivity : ComponentActivity() {
   OutlinedButton(onClick = { vm.password(current, password, confirm) }, enabled = !state.busy && current.isNotBlank() && password.length >= 12 && password == confirm) { Text("Change password and sign out") }
  }
 }
+private fun reportStatus(value: String): String = when (value) { "done", "resolved", "closed", "rejected", "duplicate" -> "Done"; "need_action", "submitted", "received", "verified", "in_progress" -> "Need action"; else -> value.replace('_', ' ') }
 private fun localTime(value: String): String = runCatching { DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm z").withZone(ZoneId.of("Asia/Manila")).format(Instant.parse(value)) }.getOrDefault(value)

@@ -57,7 +57,14 @@ class FcmSecretTest extends TestCase
         config(['services.fcm.credentials_json' => json_encode($this->account())]);
         $fcm->send($user, ['status' => 'done']);
         $this->assertCount(2, Http::recorded(fn ($r) => str_contains($r->url(), 'oauth2.googleapis.com')));
-        Http::assertSent(fn ($r) => $r->url() === 'https://fcm.googleapis.com/v1/projects/synthetic-project/messages:send' && $r['message']['token'] === 'synthetic-device');
+        Http::assertSent(fn ($r) => $r->url() === 'https://fcm.googleapis.com/v1/projects/synthetic-project/messages:send'
+            && $r['message']['token'] === 'synthetic-device'
+            && $r['message']['data']['status'] === 'done'
+            && $r['message']['notification']['title'] === 'CDRMAPP status update'
+            && $r['message']['android']['priority'] === 'high'
+            && $r['message']['android']['notification']['channel_id'] === 'incident-status'
+            && $r['message']['android']['notification']['visibility'] === 'PRIVATE'
+            && ! isset($r['message']['notification']['description']));
     }
 
     public function test_invalid_json_and_credentials_fail_safely_without_network_requests(): void
@@ -81,6 +88,14 @@ class FcmSecretTest extends TestCase
         $user = $this->configure('invalid');
         config(['services.fcm.enabled' => false]);
         app(Fcm::class)->send($user, []);
+        Http::assertNothingSent();
+    }
+
+    public function test_recipients_without_registered_devices_do_not_contact_google(): void
+    {
+        $user = $this->configure('invalid');
+        DeviceToken::where('user_id', $user->id)->delete();
+        app(Fcm::class)->send($user, ['status' => 'done']);
         Http::assertNothingSent();
     }
 }

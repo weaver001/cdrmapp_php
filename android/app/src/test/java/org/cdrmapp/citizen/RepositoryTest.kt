@@ -41,6 +41,22 @@ class RepositoryTest {
    assertEquals("synthetic-token", store.get("token")); assertEquals("42", store.get("user_id")); assertTrue(repo.hasSession())
   } finally { server.shutdown() }
  }
+ @Test fun wrongLoginCredentialsUseOnlyTheRequestedMessage() = runBlocking {
+  val server = MockWebServer(); server.start()
+  try {
+   val store = MemoryStore()
+   val repo = Repository(store, server.url("/api/v1/").toString())
+   for (status in listOf(401, 422)) {
+    server.enqueue(MockResponse().setResponseCode(status).setBody("""{"error":{"message":"Invalid credentials or inactive account."}}"""))
+    try { repo.login("wrong@example.test", "incorrect"); fail("Expected rejected credentials") } catch (e: InvalidCredentialsException) { assertEquals("Incorrect Username/Password", e.message) }
+    assertFalse(repo.hasSession())
+   }
+   for (status in listOf(429, 500)) {
+    server.enqueue(MockResponse().setResponseCode(status).setBody("{}"))
+    try { repo.login("wrong@example.test", "incorrect"); fail("Expected HTTP failure") } catch (e: HttpException) { assertEquals(status, e.code()) }
+   }
+  } finally { server.shutdown() }
+ }
  @Test fun freshLoginAttachesTokenToEveryFollowUpRequestAndDiagnosticsExcludeSecrets() = runBlocking {
   val server = MockWebServer(); server.start()
   try {
@@ -73,6 +89,16 @@ class RepositoryTest {
    val repo = Repository(store, server.url("/api/v1/").toString())
    try { repo.login("citizen@example.test", "synthetic-password"); fail("Unreadable session must fail") } catch (_: SessionStorageException) {}
    assertFalse(repo.hasSession()); assertEquals(1, server.requestCount)
+  } finally { server.shutdown() }
+ }
+ @Test fun reloadingHistoryReadsTheUpdatedServerStatus() = runBlocking {
+  val server = MockWebServer(); server.start()
+  try {
+   for (status in listOf("need_action", "done")) server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":[{"id":7,"public_reference":"synthetic-reference","description":"SYNTHETIC test report","workflow_status":"$status","received_at":"2026-10-22T00:00:00Z","latitude":14.8139,"longitude":121.0453}],"meta":{"current_page":1,"last_page":1}}"""))
+   val repo = Repository(MemoryStore().apply { put("token", "synthetic-token") }, server.url("/api/v1/").toString())
+   assertEquals("need_action", repo.api.incidents(1).data.single().status)
+   assertEquals("done", repo.api.incidents(1).data.single().status)
+   repeat(2) { assertEquals("/api/v1/incidents?page=1", server.takeRequest().path) }
   } finally { server.shutdown() }
  }
 }

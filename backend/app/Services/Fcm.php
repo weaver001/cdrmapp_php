@@ -14,6 +14,9 @@ class Fcm
         if (! config('services.fcm.enabled')) {
             return;
         }
+        if (! DeviceToken::where('user_id', $user->id)->exists()) {
+            return;
+        }
         $project = config('services.fcm.project');
         if (! preg_match('/^[a-z][a-z0-9-]{4,62}$/', (string) $project)) {
             throw new \RuntimeException('FCM configuration is incomplete.');
@@ -52,7 +55,12 @@ class Fcm
             return $response->json('access_token');
         });
         foreach (DeviceToken::where('user_id', $user->id)->cursor() as $device) {
-            $response = Http::withToken($access)->timeout(15)->post('https://fcm.googleapis.com/v1/projects/'.$project.'/messages:send', ['message' => ['token' => $device->token, 'data' => array_map('strval', $data), 'android' => ['priority' => 'normal']]]);
+            $response = Http::withToken($access)->timeout(15)->post('https://fcm.googleapis.com/v1/projects/'.$project.'/messages:send', ['message' => [
+                'token' => $device->token,
+                'notification' => ['title' => 'CDRMAPP status update', 'body' => 'Open the application to view your latest incident status.'],
+                'data' => array_map('strval', $data),
+                'android' => ['priority' => 'high', 'notification' => ['channel_id' => 'incident-status', 'icon' => 'ic_stat_cdrmapp', 'visibility' => 'PRIVATE']],
+            ]]);
             if ($response->json('error.details.0.errorCode') === 'UNREGISTERED') {
                 $device->delete();
 

@@ -27,7 +27,7 @@ const assert = require('node:assert/strict');
                 return route.fulfill({ contentType: 'application/javascript', body: `
                     window.__markers = [];
                     window.google = { maps: {
-                        Map: class {}, Size: class { constructor(width,height) { Object.assign(this,{width,height}); } },
+                        Map: class { constructor() { window.__map=this; } panTo(position) { this.center=position; } setZoom(zoom) { this.zoom=zoom; } }, Size: class { constructor(width,height) { Object.assign(this,{width,height}); } },
                         Point: class { constructor(x,y) { Object.assign(this,{x,y}); } },
                         Marker: class { constructor(options) { this.options=options;this.listeners={};window.__markers.push(this); } addListener(name,callback) {this.listeners[name]=callback;} setMap(map) { this.options.map=map; } }
                     }};
@@ -51,13 +51,13 @@ const assert = require('node:assert/strict');
                 return route.fulfill({ json: { data: report } });
             }
             if (url.pathname.endsWith('/summary')) return route.fulfill({ json: { data: { total: 16, by_status: { need_action: reports.filter(report => report.workflow_status === 'need_action').length, done: reports.filter(report => report.workflow_status === 'done').length }, validated: 0 } } });
-            if (url.pathname.endsWith('/incidents')) return route.fulfill({ json: { data: reports.filter(report => !url.searchParams.get('status') || report.workflow_status === url.searchParams.get('status')), meta: { last_page: 1 } } });
+            if (url.pathname.endsWith('/incidents')) return route.fulfill({ json: { data: reports.filter(report => (!url.searchParams.get('status') || report.workflow_status === url.searchParams.get('status')) && (!url.searchParams.get('q') || report.public_reference === url.searchParams.get('q'))), meta: { last_page: 1 } } });
             if (url.pathname.endsWith('/notifications')) return route.fulfill({ json: { data: [], meta: { total: 0 } } });
             if (url.pathname.endsWith('/heatmap')) return route.fulfill({ json: { data: { points: [], exploratory: false } } });
             const mapView = url.pathname === '/incident-map';
             return route.fulfill({ contentType: 'text/html', body: `<meta name="csrf-token" content="synthetic">
                 <div id="dashboard" ${mapView ? 'data-map-key="synthetic"' : ''} data-role="admin">
-                <form id="filters"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><select name="agency_id"><option value="">All authorized</option><option value="1">Fire Department (BFP)</option><option value="2">Police Department (PNP)</option><option value="3">MDRRMO</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
+                <form id="filters"><input name="q"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><select name="agency_id"><option value="">All authorized</option><option value="1">Fire Department (BFP)</option><option value="2">Police Department (PNP)</option><option value="3">MDRRMO</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
                 <span id="page"></span><button id="previous"></button><button id="next"></button>
                 <a id="switch-view" href="${mapView ? '/dashboard' : '/incident-map'}"></a><a id="export"></a><button id="print"></button><button id="refresh"></button>
                 ${mapView ? `
@@ -119,6 +119,12 @@ const assert = require('node:assert/strict');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
         await page.locator('#incidents tr').first().waitFor();
         assert.equal(await page.locator('#incidents tr').count(), 16);
+        const eyeLink = page.getByRole('link', { name: 'View report synthetic-6 on map', exact: true });
+        const destination = new URL(await eyeLink.getAttribute('href'), 'http://cdrmapp.test');
+        assert.equal(destination.pathname, '/incident-map');
+        assert.equal(destination.searchParams.get('q'), 'synthetic-6');
+        assert.equal(destination.searchParams.get('focus'), '6');
+        assert.equal(await eyeLink.locator('svg[aria-hidden="true"]').count(), 1);
         assert.ok((await page.locator('#incidents tr').first().textContent()).includes('Latitude: 14.806000 · Longitude: 121.039000'));
         await page.getByRole('button', { name: 'Mark as done', exact: true }).first().click();
         await page.getByRole('button', { name: 'Mark as undone', exact: true }).waitFor();
@@ -131,10 +137,23 @@ const assert = require('node:assert/strict');
         await page.locator('[name=status]').selectOption('done');
         await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
         await page.getByText('No reports match these filters.', { exact: true }).waitFor();
-        assert.equal(await page.locator('#incidents td').getAttribute('colspan'), '6');
+        assert.equal(await page.locator('#incidents td').getAttribute('colspan'), '7');
         assert.equal(new URL(await page.locator('#switch-view').getAttribute('href'), 'http://cdrmapp.test').searchParams.get('status'), 'done');
+        reports[5].workflow_status = 'done';
+        await page.locator('#refresh').click();
+        await page.getByRole('link', { name: 'View report synthetic-6 on map', exact: true }).click();
+        await page.waitForURL('**/incident-map?**');
+        await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
+        await page.waitForFunction(() => window.__markers?.length === 1 && window.__map?.zoom === 16);
+        assert.deepEqual(await page.evaluate(() => window.__map.center), { lat: reports[5].latitude, lng: reports[5].longitude });
+        assert.equal(await page.evaluate(() => window.__markers[0].options.icon.url), '/images/map/police-done.svg');
+        assert.ok((await page.locator('#map-status').textContent()).includes('Viewing report synthetic-6.'));
+        await page.evaluate(() => { window.__map.panTo({lat:14.8,lng:121}); window.__map.setZoom(12); });
+        await page.locator('#refresh').click();
+        await page.waitForFunction(() => window.__markers.filter(m => m.options.map).length === 1 && window.__markers.length === 2);
+        assert.equal(await page.evaluate(() => window.__map.zoom), 12, 'Polling must preserve the user map position.');
         assert.deepEqual(errors, []);
-        console.log('PASS: all agency pins turn gray when Done and restore their colors when undone; dashboard coordinates/actions/filtering; no Google Maps requests from reports.');
+        console.log('PASS: watchlist eye link opens the selected report at its coordinates with the correct Done pin; polling preserves map position; agency pins, status actions, filtering and report-only Maps isolation.');
     } finally {
         await browser.close();
     }

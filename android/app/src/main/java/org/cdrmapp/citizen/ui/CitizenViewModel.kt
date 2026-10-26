@@ -23,7 +23,7 @@ class CitizenViewModel(application: Application) : AndroidViewModel(application)
    try { action() } catch (e: Exception) {
     if (e is kotlinx.coroutines.CancellationException) throw e
     if (e is HttpException && e.code() == 401) { repo.clearSession(); mutable.value = mutable.value.copy(user = null) }
-    val message = if (e is SessionStorageException) "This device could not save your secure session. Restart the app and sign in again." else if (e is HttpException) when(e.code()) { 401 -> "Session expired. Sign in again."; 403 -> "Verify your email or check your account access."; 422 -> "Please check the submitted fields. Passwords require 12 characters, letters and numbers. GPS must be fresh."; 409 -> "The saved retry conflicts with a previous request. Contact support with your report reference."; 429 -> "Too many requests. Wait briefly before retrying."; else -> "Server error. Delivery is unconfirmed; retry the saved submission." } else "Connection failed. Delivery is unconfirmed. Your saved report can be retried."
+    val message = if (e is InvalidCredentialsException) e.message.orEmpty() else if (e is SessionStorageException) "This device could not save your secure session. Check available device storage or try another Android device. Contact support if this continues." else if (e is HttpException) when(e.code()) { 401 -> "Session expired. Sign in again."; 403 -> "Verify your email or check your account access."; 422 -> "Please check the submitted fields. Passwords require 12 characters, letters and numbers. GPS must be fresh."; 409 -> "The saved retry conflicts with a previous request. Contact support with your report reference."; 429 -> "Too many requests. Wait briefly before retrying."; else -> "Server error. Delivery is unconfirmed; retry the saved submission." } else "Connection failed. Delivery is unconfirmed. Your saved report can be retried."
     mutable.value = mutable.value.copy(message = message, pending = repo.pending())
    } finally { mutable.value = mutable.value.copy(busy = false) }
   }
@@ -43,6 +43,12 @@ class CitizenViewModel(application: Application) : AndroidViewModel(application)
  fun forgot(email: String) = run { repo.api.forgot(mapOf("email" to email)); mutable.value = mutable.value.copy(message = "If the account exists, a password reset email has been sent.") }
  fun resend() = run { repo.api.resend(); mutable.value = mutable.value.copy(message = "Verification email requested.") }
  fun refresh() = run { refreshInternal() }
+ fun refreshHistory() = run {
+  val detailId = mutable.value.detail?.id
+  val list = repo.api.incidents(mutable.value.page)
+  val detail = detailId?.let { repo.api.incident(it).data }
+  mutable.value = mutable.value.copy(incidents = list.data, lastPage = list.meta.lastPage, detail = if (mutable.value.detail?.id == detailId) detail else mutable.value.detail)
+ }
  fun page(value: Int) = run { mutable.value = mutable.value.copy(page = value.coerceIn(1, mutable.value.lastPage)); refreshInternal() }
  fun submit(submission: Submission) = run { val i = repo.send(submission); mutable.value = mutable.value.copy(pending = null, message = "Server received report ${i.reference}. Check the stored report details. This does not guarantee an agency response."); refreshInternal() }
  fun confirmSavedLocation() { repo.pending()?.let { submit(it.copy(source="manual",accuracy=null,observedAt=null)) } }

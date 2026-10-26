@@ -67,6 +67,8 @@ if (dashboard) {
     const filters = document.querySelector('#filters'); const message = document.querySelector('#dashboard-status');
     const mapView = !!document.querySelector('#map');
     const initialFilters = new URLSearchParams(window.location.search);
+    const focusId = initialFilters.get('focus');
+    let focused = false;
     for (const field of filters.elements) if (field.name && initialFilters.has(field.name)) field.value = initialFilters.get(field.name);
     let page = 1, lastPage = 1, busy = false, map, overlay, HeatmapLayerClass, markers = [], latest = [], mapsPromise;
     const params = () => new URLSearchParams([...new FormData(filters)].filter(([, value]) => value));
@@ -89,6 +91,12 @@ if (dashboard) {
     }
     async function updateMap() {
         if (!await ensureMap()) return;
+        const selected = latest.find(i => String(i.id) === focusId);
+        if (selected && !focused) {
+            map.panTo({ lat: selected.latitude, lng: selected.longitude });
+            map.setZoom(16);
+            focused = true;
+        }
         markers.forEach(m => m.setMap(null)); markers = [];
         if (document.querySelector('#show-pins').checked) for (const i of latest) {
             const icon = { FIRE: 'fire', PNP: 'police', MDRRMO: 'mdrrmo' }[i.agency?.type];
@@ -100,7 +108,7 @@ if (dashboard) {
         const p = params(); p.set('exploratory', document.querySelector('#exploratory').checked ? '1' : '0');
         const result = await api(`/api/v1/analytics/heatmap?${p}`);
         overlay.setProps({ layers: [new HeatmapLayerClass({ id: 'validated-incident-density', data: result.data.points, getPosition: p => [p.longitude, p.latitude], getWeight: p => p.weight, radiusPixels: 45, intensity: 1 })] });
-        document.querySelector('#map-status').textContent = `${result.data.points.length} eligible density cells. ${result.data.exploratory ? 'Exploratory view includes unverified and uncertain locations.' : 'Validated incidents only.'}`;
+        document.querySelector('#map-status').textContent = `${selected ? `Viewing report ${selected.public_reference}. ` : ''}${result.data.points.length} eligible density cells. ${result.data.exploratory ? 'Exploratory view includes unverified and uncertain locations.' : 'Validated incidents only.'}`;
     }
     async function action(id, operation) {
         try {
@@ -167,14 +175,20 @@ if (dashboard) {
             }
             document.querySelector('#unread').textContent = `${notifications.meta?.total ?? notifications.total ?? notifications.data.length} unread notifications`;
             const rows = document.querySelector('#incidents'); rows?.replaceChildren(); latest = incidents.data;
-            if (rows && !latest.length) { const tr = node('tr'); const td = node('td', 'No reports match these filters.'); td.colSpan = 6; tr.append(td); rows.append(tr); }
+            if (rows && !latest.length) { const tr = node('tr'); const td = node('td', 'No reports match these filters.'); td.colSpan = 7; tr.append(td); rows.append(tr); }
             if (rows) for (const i of latest) {
                 const tr = node('tr'); const ref = node('td'); ref.append(button(i.public_reference.slice(0, 8), () => detail(i.id)), node('p', date(i.received_at), 'text-xs mt-2'));
                 const actions = node('td'); actions.append(button(i.workflow_status === 'done' ? 'Mark as undone' : 'Mark as done', () => action(i.id, i.workflow_status === 'done' ? 'need_action' : 'done')));
                 const location = node('td'); if (i.address) location.append(node('p', i.address));
                 location.append(node('p', `Latitude: ${Number(i.latitude).toFixed(6)} · Longitude: ${Number(i.longitude).toFixed(6)}`, 'text-sm'));
                 const status = node('td'); status.append(node('span', reportStatusLabel(i.workflow_status), `status-badge ${i.workflow_status === 'done' ? 'status-done' : 'status-need_action'}`));
-                tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), location, status, actions); rows.append(tr);
+                const mapCell = node('td'), mapLink = node('a', null, 'btn-secondary inline-flex items-center justify-center');
+                mapLink.href = `/incident-map?${new URLSearchParams({ q: i.public_reference, focus: String(i.id) })}`;
+                mapLink.title = 'View on map'; mapLink.setAttribute('aria-label', `View report ${i.public_reference} on map`);
+                const eye = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) eye.setAttribute(name, value);
+                const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'); eye.append(shape); mapLink.append(eye); mapCell.append(mapLink);
+                tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), location, status, mapCell, actions); rows.append(tr);
             }
             lastPage = incidents.meta.last_page; document.querySelector('#page').textContent = `Page ${page} of ${lastPage}`; document.querySelector('#previous').disabled = page <= 1; document.querySelector('#next').disabled = page >= lastPage;
             document.querySelector('#export').href = `/api/v1/reports/export?${params()}`;
