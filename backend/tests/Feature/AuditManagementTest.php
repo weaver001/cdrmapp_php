@@ -15,6 +15,22 @@ class AuditManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_admin_password_reset_reports_success_only_when_the_link_is_sent(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $user = User::factory()->create();
+        Password::shouldReceive('sendResetLink')->once()->with(['email' => $user->email])->andReturn(Password::RESET_LINK_SENT);
+        $this->postJson('/api/v1/management/users/'.$user->id.'/reset-password')->assertOk()->assertJsonPath('data.message', 'Password reset requested.');
+    }
+
+    public function test_throttled_password_reset_is_reported_as_an_error(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $user = User::factory()->create();
+        Password::shouldReceive('sendResetLink')->once()->andReturn(Password::RESET_THROTTLED);
+        $this->postJson('/api/v1/management/users/'.$user->id.'/reset-password')->assertUnprocessable();
+    }
+
     public function test_admin_forms_have_clear_buttons_and_simple_agency_routing(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']));

@@ -62,8 +62,8 @@ if (dashboard) {
         if (!await ensureMap()) return;
         markers.forEach(m => m.setMap(null)); markers = [];
         if (document.querySelector('#show-pins').checked) for (const i of latest) {
-            const color = i.agency?.type === 'MDRRMO' ? '#7e22ce' : i.agency?.type === 'FIRE' ? '#dc2626' : '#1d4ed8';
-            const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.agency?.name || 'Needs triage'} ${i.public_reference}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+            const icon = { FIRE: 'fire', PNP: 'police', MDRRMO: 'mdrrmo' }[i.agency?.type] || 'triage';
+            const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.is_test ? '[TEST] ' : ''}${i.agency?.name || 'Needs triage'} ${i.public_reference}`, icon: { url: `/images/map/${icon}.svg`, scaledSize: new google.maps.Size(40, 48), anchor: new google.maps.Point(20, 47) } });
             m.addListener('click', () => detail(i.id)); markers.push(m);
         }
         const p = params(); p.set('exploratory', document.querySelector('#exploratory').checked ? '1' : '0');
@@ -138,10 +138,17 @@ if (management) {
         'content.deleted': 'Removed content', 'content.image_updated': 'Updated content image',
         'agency.updated': 'Updated agency', 'dispatch.created': 'Added agency routing', 'dispatch.updated': 'Updated agency routing', 'dispatch.saved': 'Saved dispatch rule',
         'message.trash': 'Removed contact message', 'message.restore': 'Restored contact message', 'message.destroy': 'Permanently deleted contact message',
-        'incident.created': 'Added incident report', 'incident.status': 'Changed incident status', 'incident.assignment': 'Changed incident assignment',
+        'incident.created': 'Added incident report', 'incident.test_created': 'Added test incident report', 'incident.status': 'Changed incident status', 'incident.assignment': 'Changed incident assignment',
     };
     const auditValue = value => value == null ? 'None' : typeof value === 'boolean' ? (value ? 'Yes' : 'No') : typeof value === 'object' ? Object.entries(value).map(([key, item]) => `${statusLabel(key)}: ${auditValue(item)}`).join('; ') : String(value);
-    async function mutate(path, method, data) { try { await api(path, method, data); message.textContent = 'Saved.'; await load(); } catch (e) { message.textContent = e.message; } }
+    async function mutate(path, method, data, successPopup = false) {
+        try {
+            const result = await api(path, method, data);
+            message.textContent = result.data?.message || 'Saved.';
+            if (successPopup) window.alert('Success');
+            await load();
+        } catch (e) { message.textContent = e.message; }
+    }
     async function load() {
         try {
             const result = await api(`${endpoint}?page=${page}&trash=${document.querySelector('#trash')?.checked ? 1 : 0}`); const list = document.querySelector('#records'); list.replaceChildren();
@@ -188,7 +195,7 @@ if (management) {
                     }
                     card.append(button('Edit', () => { for (const field of editor.elements) { if (!field.name || field.type === 'file') continue; if (field.type === 'checkbox') field.checked = !!item[field.name]; else field.value = field.name.startsWith('details.') ? (item.details?.[field.name.slice(8)] ?? '') : (item[field.name] ?? ''); } editor.scrollIntoView({ behavior: 'smooth' }); }));
                     if (content) card.append(button('Remove', () => { if (confirm('Remove this item from publication?')) mutate(`${endpoint}/${item.id}`, 'DELETE'); }));
-                    else if(module==='users') card.append(button('Send password reset', () => mutate(`${endpoint}/${item.id}/reset-password`, 'POST', {})));
+                    else if(module==='users') card.append(button('Send password reset', () => mutate(`${endpoint}/${item.id}/reset-password`, 'POST', {}, true)));
                 }
                 list.append(card);
             }

@@ -28,11 +28,16 @@ const form = (module, fields, label) => `<form id="editor" data-endpoint="/api/v
             return page;
         }
 
-        let account = null, invalid = false;
+        let account = null, invalid = false, resetFailure = false;
         const userWrites = [];
         const users = await open('users', shell('users', form('users', `<input name="name" required><input name="email" type="email" required><select name="role" required><option value="">Select role</option><option value="citizen">Citizen</option></select><select name="agency_id"><option value="">None</option></select><input type="checkbox" name="active" checked>`, 'Save account')), async route => {
             const request = route.request();
             if (request.method() === 'GET') return route.fulfill({ json: { data: account ? [account] : [], last_page: 1 } });
+            if (new URL(request.url()).pathname.endsWith('/reset-password')) {
+                return resetFailure
+                    ? route.fulfill({ status: 422, json: { error: { message: 'Please wait before retrying.' } } })
+                    : route.fulfill({ json: { data: { message: 'Password reset requested.' } } });
+            }
             userWrites.push(request.method());
             if (invalid) return route.fulfill({ status: 422, json: { error: { message: 'Email already exists.' } } });
             account = { ...request.postDataJSON(), id: 12 };
@@ -61,6 +66,15 @@ const form = (module, fields, label) => `<form id="editor" data-endpoint="/api/v
         await users.getByRole('button', { name: 'Clear Field', exact: true }).click();
         assert.equal(await users.locator('[name=email]').inputValue(), '');
         assert.equal(await users.locator('#form-status').textContent(), '');
+        const popups = [];
+        users.on('dialog', async dialog => { popups.push(dialog.message()); await dialog.dismiss(); });
+        await users.getByRole('button', { name: 'Send password reset', exact: true }).click();
+        await users.getByText('Password reset requested.', { exact: true }).waitFor();
+        assert.deepEqual(popups, ['Success']);
+        resetFailure = true;
+        await users.getByRole('button', { name: 'Send password reset', exact: true }).click();
+        await users.getByText('Please wait before retrying.', { exact: true }).waitFor();
+        assert.deepEqual(popups, ['Success'], 'Failed reset requests must not show a success popup.');
 
         let routing = { id: 3, agency_id: 8, agency: { name: 'MDRRMO' }, active: true };
         const routes = await open('dispatch-rules', shell('dispatch-rules', form('dispatch-rules', '<select name="agency_id" required><option value="">Select agency</option><option value="8">MDRRMO</option></select><input type="checkbox" name="active" checked>', 'Save routing')), async route => {

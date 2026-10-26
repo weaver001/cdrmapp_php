@@ -111,7 +111,8 @@ class ManagementController extends Controller
     public function resetUser(User $user)
     {
         Gate::authorize('admin');
-        Password::sendResetLink(['email' => $user->email]);
+        $status = Password::sendResetLink(['email' => $user->email]);
+        abort_unless($status === Password::RESET_LINK_SENT, 422, __($status));
 
         return ['data' => ['message' => 'Password reset requested.']];
     }

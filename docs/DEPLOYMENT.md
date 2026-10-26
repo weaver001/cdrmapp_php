@@ -36,3 +36,17 @@ Reference: [Laravel Cloud Object Storage](https://cloud.laravel.com/docs/resourc
 ## Admin workflow and agency routing deployment
 
 Run `php artisan migrate --force` to create and initialize agency routing settings, and rebuild the frontend assets. The new migration enables BFP, PNP and MDRRMO routing by default. Review **Admin → Dispatch rules** after deployment and disable automatic routing for any agency that should require triage. New incidents route by the category's agency without coordinate boundaries; existing incident assignments and legacy rectangle records are preserved. Existing older audit entries remain available, while newly created events include actor and subject snapshots and before/after changes. Forms clear only after complete successful saves; failed image uploads retain the saved item's ID for retry.
+
+## San Jose del Monte test reports
+
+After deploying, run this in Laravel Cloud production's **Commands** when you want the synthetic demonstration batch:
+
+```bash
+php artisan cdrmapp:seed-test-reports
+```
+
+It creates exactly five Fire Department (BFP), five Crime / Police Department (PNP), and five MDRRMO reports. Re-running keeps the same fifteen reports without changing their coordinates or workflow state. All are visibly labeled TEST and marked `is_test=true`, so they appear in authorized report lists and map pins but are excluded from both heatmap modes. No email or push notifications are sent. The synthetic reporter is an inactive citizen account at a reserved `.invalid` address; no usable login credentials are produced. Active agencies and linked incident categories must already exist; the command does not modify routing settings or real accounts/reports.
+
+Locations use randomized offsets within fifteen separate cells in the central San Jose del Monte area. Cell corners were checked against the [OpenStreetMap San Jose del Monte administrative boundary](https://www.openstreetmap.org/relation/15662634) (© OpenStreetMap contributors); addresses and events are synthetic and do not identify actual emergencies. The map legend and pins use red flame (BFP), blue police badge (PNP), purple rescue cross (MDRRMO), and a neutral question mark for triage. Pins show the current report page and respect its filters. Clear filters, return to page one, and enable **Show incident pins** to inspect the batch.
+
+Checks: `node infra/map-pins-smoke.cjs` intercepts Google Maps and API requests to validate agency/icon mapping, test labels, positions and anchors without real Maps quota. Backend tests validate counts, repeatability, preservation of existing data, heatmap exclusion, and absence of notifications.

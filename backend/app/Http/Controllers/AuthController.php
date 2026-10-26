@@ -91,6 +91,12 @@ class AuthController extends Controller
             $r->user()->sendEmailVerificationNotification();
         }
 
+        if (! $r->is('api/*') && ! $r->expectsJson()) {
+            return redirect()->route('verification.notice')->with('status', $r->user()->hasVerifiedEmail()
+                ? 'Your email is already verified. You may sign in.'
+                : 'Verification link sent. Please check your inbox.');
+        }
+
         return ['data' => ['message' => 'Verification link requested.']];
     }
 
@@ -101,6 +107,10 @@ class AuthController extends Controller
         if (! $u->hasVerifiedEmail()) {
             $u->markEmailAsVerified();
             event(new Verified($u));
+        }
+
+        if (! $r->expectsJson()) {
+            return view('verification-result');
         }
 
         return ['data' => ['message' => 'Email verified. You may return to the app.']];
