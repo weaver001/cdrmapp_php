@@ -14,16 +14,34 @@ class Fcm
         if (! config('services.fcm.enabled')) {
             return;
         }
-        $file = config('services.fcm.credentials');
         $project = config('services.fcm.project');
-        if (! $file || ! is_readable($file) || ! preg_match('/^[a-z][a-z0-9-]{4,62}$/', (string) $project)) {
+        if (! preg_match('/^[a-z][a-z0-9-]{4,62}$/', (string) $project)) {
             throw new \RuntimeException('FCM configuration is incomplete.');
         }
-        $access = Cache::remember('fcm-token:'.hash('sha256', $file.'|'.$project), 3000, function () use ($file) {
-            $account = json_decode(file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
+        $json = config('services.fcm.credentials_json');
+        if ($json === null || $json === '') {
+            $file = config('services.fcm.credentials');
+            if (! is_string($file) || ! is_file($file) || ! is_readable($file)) {
+                throw new \RuntimeException('FCM configuration is incomplete.');
+            }
+            $json = file_get_contents($file);
+        }
+        try {
+            $account = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException|\TypeError) {
+            throw new \RuntimeException('FCM service-account JSON is invalid.');
+        }
+        if (! is_array($account) || ! is_string($account['client_email'] ?? null) || ! filter_var($account['client_email'], FILTER_VALIDATE_EMAIL) || ! is_string($account['private_key'] ?? null) || $account['private_key'] === '') {
+            throw new \RuntimeException('FCM service-account credentials are incomplete.');
+        }
+        $access = Cache::remember('fcm-token:'.hash('sha256', $json.'|'.$project), 3000, function () use ($account) {
+            $key = @openssl_pkey_get_private($account['private_key']);
+            if (! $key || openssl_pkey_get_details($key)['type'] !== OPENSSL_KEYTYPE_RSA) {
+                throw new \RuntimeException('FCM service-account signing key is invalid.');
+            }
             $encode = fn ($s) => rtrim(strtr(base64_encode($s), '+/', '-_'), '=');
             $jwt = $encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'])).'.'.$encode(json_encode(['iss' => $account['client_email'], 'scope' => 'https://www.googleapis.com/auth/firebase.messaging', 'aud' => 'https://oauth2.googleapis.com/token', 'iat' => time(), 'exp' => time() + 3600]));
-            if (! openssl_sign($jwt, $signature, $account['private_key'], OPENSSL_ALGO_SHA256)) {
+            if (! openssl_sign($jwt, $signature, $key, OPENSSL_ALGO_SHA256)) {
                 throw new \RuntimeException('FCM signing failed.');
             }
             $response = Http::asForm()->timeout(15)->post('https://oauth2.googleapis.com/token', ['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $jwt.'.'.$encode($signature)]);

@@ -11,6 +11,16 @@ Publish Android using a securely managed release signing key, a real HTTPS API U
 The current task validates local development only. A production FPM image, deployment automation, backups/restores and signed release deployment are not yet built or tested. This document records prerequisites rather than asserting production readiness.
 
 
+## Laravel Cloud: Firebase messaging secret
+
+Attach a production secret named `FCM_SERVICE_ACCOUNT_JSON` whose value is the complete, unmodified Firebase Admin service-account JSON (including the outer braces). Preserve JSON escaping in the private key; do not wrap the entire value in extra quotes, base64-encode it, or upload it to a public bucket. Set `FCM_ENABLED=true` and `FCM_PROJECT_ID=cdrmapp` for this deployment. The Android `google-services.json` is a separate client configuration and cannot be used here.
+
+Deploy the backend revision that supports this secret, rebuild cached configuration if managed manually (`php artisan config:cache`), and ensure the secret is available to the queue-worker process as well as the web application. Restart long-running workers after a deployment or secret change. If no managed worker exists, configure one to run `php artisan queue:work --tries=3 --timeout=60`. No database migration or APK rebuild is required for this backend configuration change.
+
+The JSON secret takes precedence over `FCM_SERVICE_ACCOUNT_FILE`; an invalid nonempty secret fails rather than silently using an older file. Leave the file variable unset when using the secret. `FCM_SERVICE_ACCOUNT_FILE_HOST` only belongs to the local Docker overlay. Existing file-based deployments remain supported. Credential changes use a fresh OAuth token cache key. Keep cached Laravel configuration private because it contains the credential.
+
+Enable Firebase Cloud Messaging API (HTTP v1) in the Google Cloud project and grant the service account permission to send messages. To verify delivery, sign in on a physical Android device, enable notifications, and change the status of an authorized report belonging to that account. Inspect queue failures and Laravel Cloud logs if delivery fails; never share private keys, OAuth tokens or device tokens. Local automated checks use generated credentials and mocked Google responses; they do not verify live production delivery.
+
 ## Laravel Cloud: persistent CMS image uploads
 
 Announcement, service, and team images can use a private Laravel Cloud Object Storage bucket. The application records the disk alongside each image and returns a 30-minute signed `image_url` in public content responses. Reload the page or fetch the API again after a link expires; do not cache content responses or rendered HTML beyond this lifetime. Only published content is returned by public endpoints. Treat signed links as bearer links: someone who receives a link can use it until it expires, even if the item is subsequently unpublished.

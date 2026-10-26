@@ -112,7 +112,7 @@ class MediaAndSecurityTest extends TestCase
         openssl_pkey_export($key, $private);
         $path = Storage::disk('local')->path('synthetic-service-account.json');
         file_put_contents($path, json_encode(['client_email' => 'synthetic@example.test', 'private_key' => $private]));
-        config(['services.fcm.enabled' => true, 'services.fcm.project' => 'synthetic-project', 'services.fcm.credentials' => $path]);
+        config(['services.fcm.enabled' => true, 'services.fcm.project' => 'synthetic-project', 'services.fcm.credentials' => $path, 'services.fcm.credentials_json' => null]);
         Http::fake(['oauth2.googleapis.com/*' => Http::response(['access_token' => 'synthetic-access'], 200), 'fcm.googleapis.com/*' => Http::response(['name' => 'synthetic-message'], 200)]);
         app(Fcm::class)->send($a, ['incident_id' => 123, 'status' => 'received']);
         Http::assertSent(fn ($r) => str_contains($r->url(), 'fcm.googleapis.com') && $r['message']['token'] === 'synthetic-a' && ! isset($r['message']['data']['description']));
