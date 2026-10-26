@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><meta name="theme-color" content="#005f35"><title>{{ $title ?? 'CDRMAPP' }} · CDRMAPP</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><meta name="theme-color" content="#005f35"><link rel="icon" href="{{ asset('favicon.ico') }}?v=2" sizes="16x16 32x32 48x48 64x64"><link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}" sizes="any"><title>{{ $title ?? 'CDRMAPP' }} · CDRMAPP</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
 <body><a href="#main" class="sr-only focus:not-sr-only">Skip to content</a>
 <header class="site-header"><div class="header-inner">
     <a href="/" class="brand"><span class="brand-mark" aria-hidden="true">C</span><span><strong class="tracking-wide">CDRMAPP</strong><small>Community information &amp; incident response</small></span></a>

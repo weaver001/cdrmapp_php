@@ -79,6 +79,23 @@ const assert = require('node:assert/strict');
             assert.ok(fs.existsSync(path.join(__dirname, `../backend/public/images/map/${file}.svg`)));
         }
         assert.equal(markers.find(marker => marker.title.endsWith('synthetic-triage')), undefined, 'Reports awaiting triage must not create map pins.');
+        for (const index of [0, 5, 10]) reports[index].workflow_status = 'done';
+        await page.locator('#refresh').click();
+        await page.waitForFunction(() => window.__markers.filter(marker => marker.options.map && marker.options.icon.url.endsWith('-done.svg')).length === 3);
+        const completed = await page.evaluate(() => window.__markers.filter(marker => marker.options.map).map(marker => ({ title: marker.options.title, icon: marker.options.icon.url })));
+        for (const [index, file] of [[0, 'fire'], [5, 'police'], [10, 'mdrrmo']]) {
+            const marker = completed.find(marker => marker.title.endsWith(reports[index].public_reference));
+            assert.equal(marker.icon, `/images/map/${file}-done.svg`);
+            assert.ok(marker.title.includes(' · Done · '));
+            assert.ok(fs.existsSync(path.join(__dirname, `../backend/public/images/map/${file}-done.svg`)));
+        }
+        assert.equal(completed.filter(marker => !marker.icon.endsWith('-done.svg')).length, 12);
+        for (const index of [0, 5, 10]) reports[index].workflow_status = 'need_action';
+        await page.locator('#refresh').click();
+        await page.waitForFunction(() => {
+            const current = window.__markers.filter(marker => marker.options.map);
+            return current.length === 15 && current.every(marker => !marker.options.icon.url.endsWith('-done.svg'));
+        });
         const mapLoads = mapsRequests;
         await page.goto('http://cdrmapp.test/dashboard');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
@@ -99,7 +116,7 @@ const assert = require('node:assert/strict');
         assert.equal(await page.locator('#incidents td').getAttribute('colspan'), '6');
         assert.equal(new URL(await page.locator('#switch-view').getAttribute('href'), 'http://cdrmapp.test').searchParams.get('status'), 'done');
         assert.deepEqual(errors, []);
-        console.log('PASS: agency pins on the separate map page; dashboard coordinates, Done/Need action actions and filtering; no Google Maps requests from the report table.');
+        console.log('PASS: all agency pins turn gray when Done and restore their colors when undone; dashboard coordinates/actions/filtering; no Google Maps requests from reports.');
     } finally {
         await browser.close();
     }

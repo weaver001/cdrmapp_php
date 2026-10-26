@@ -93,7 +93,8 @@ if (dashboard) {
         if (document.querySelector('#show-pins').checked) for (const i of latest) {
             const icon = { FIRE: 'fire', PNP: 'police', MDRRMO: 'mdrrmo' }[i.agency?.type];
             if (!icon) continue;
-            const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.is_test ? '[TEST] ' : ''}${i.agency?.name || 'Needs triage'} ${i.public_reference}`, icon: { url: `/images/map/${icon}.svg`, scaledSize: new google.maps.Size(40, 48), anchor: new google.maps.Point(20, 47) } });
+            const pin = i.workflow_status === 'done' ? `${icon}-done` : icon;
+            const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.is_test ? '[TEST] ' : ''}${i.agency?.name || 'Needs triage'} · ${reportStatusLabel(i.workflow_status)} · ${i.public_reference}`, icon: { url: `/images/map/${pin}.svg`, scaledSize: new google.maps.Size(40, 48), anchor: new google.maps.Point(20, 47) } });
             m.addListener('click', () => detail(i.id)); markers.push(m);
         }
         const p = params(); p.set('exploratory', document.querySelector('#exploratory').checked ? '1' : '0');
