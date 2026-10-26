@@ -6,6 +6,8 @@ use App\Http\Controllers\ContentController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\ManagementController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\PublicPageController;
+use App\Models\PublicPage;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
@@ -15,6 +17,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('forgot-password', [AuthController::class, 'forgot'])->middleware('throttle:login');
         Route::post('reset-password', [AuthController::class, 'reset'])->middleware('throttle:login');
     });
+    Route::get('public/pages/{type}', [PublicPageController::class, 'published'])->whereIn('type', PublicPage::TYPES);
     Route::get('public/{type}', [ContentController::class, 'published'])->whereIn('type', ContentController::TYPES);
     Route::post('public/contact-messages', [ContentController::class, 'contact'])->middleware('throttle:5,1');
     Route::middleware(['auth:sanctum', 'active'])->group(function () {
@@ -46,6 +49,8 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
             Route::get('reports', [IncidentController::class, 'index'])->middleware('can:staff');
             Route::get('reports/export', [AnalyticsController::class, 'export']);
             Route::get('management/users', [ManagementController::class, 'users']);
+            Route::get('management/pages/{type}', [PublicPageController::class, 'show'])->whereIn('type', PublicPage::TYPES);
+            Route::patch('management/pages/{type}', [PublicPageController::class, 'update'])->whereIn('type', PublicPage::TYPES);
             Route::post('management/users', [ManagementController::class, 'saveUser']);
             Route::patch('management/users/{user}', [ManagementController::class, 'saveUser']);
             Route::post('management/users/{user}/reset-password', [ManagementController::class, 'resetUser']);

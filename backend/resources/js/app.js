@@ -1,4 +1,6 @@
 const csrf = document.querySelector('meta[name=csrf-token]')?.content;
+const staffMenu = document.querySelector('[data-staff-menu]');
+if (staffMenu && window.matchMedia('(max-width: 767px)').matches) staffMenu.open = false;
 export async function api(path, method = 'GET', body) {
     const response = await fetch(path, { method, credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf }, ...(body ? { body: JSON.stringify(body) } : {}) });
     if (!response.ok) {
@@ -34,9 +36,31 @@ const formBody = form => {
     delete data.id; delete data.image;
     return data;
 };
+const pageEditor = document.querySelector('#page-editor');
+pageEditor?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const status = document.querySelector('#page-status');
+    const submit = pageEditor.querySelector('button[type=submit], button:not([type])');
+    if (submit.disabled) return;
+    submit.disabled = true;
+    status.textContent = 'Saving page…';
+    try {
+        const result = await api(pageEditor.dataset.endpoint, 'PATCH', formBody(pageEditor));
+        for (const name of ['eyebrow', 'heading', 'introduction', 'form_heading', 'form_introduction']) {
+            const field = pageEditor.elements.namedItem(name);
+            if (field) field.value = result.data[name] ?? '';
+        }
+        status.textContent = result.message || 'Page updated successfully.';
+    } catch (error) { status.textContent = error.message; }
+    finally { submit.disabled = false; }
+});
 for (const form of document.querySelectorAll('.api-form')) form.addEventListener('submit', async event => {
     event.preventDefault(); const status = document.querySelector('#form-status');
-    try { const result = await api(form.dataset.endpoint, form.dataset.method, formBody(form)); status.textContent = result.data.message || 'Profile updated.'; } catch (e) { status.textContent = e.message; }
+    try {
+        const result = await api(form.dataset.endpoint, form.dataset.method, formBody(form));
+        status.textContent = result.data.message || 'Profile updated.';
+        if (result.data.redirect) { form.reset(); window.location.assign(result.data.redirect); }
+    } catch (e) { status.textContent = e.message; }
 });
 const dashboard = document.querySelector('#dashboard');
 if (dashboard) {
@@ -67,7 +91,8 @@ if (dashboard) {
         if (!await ensureMap()) return;
         markers.forEach(m => m.setMap(null)); markers = [];
         if (document.querySelector('#show-pins').checked) for (const i of latest) {
-            const icon = { FIRE: 'fire', PNP: 'police', MDRRMO: 'mdrrmo' }[i.agency?.type] || 'triage';
+            const icon = { FIRE: 'fire', PNP: 'police', MDRRMO: 'mdrrmo' }[i.agency?.type];
+            if (!icon) continue;
             const m = new google.maps.Marker({ position: { lat: i.latitude, lng: i.longitude }, map, title: `${i.is_test ? '[TEST] ' : ''}${i.agency?.name || 'Needs triage'} ${i.public_reference}`, icon: { url: `/images/map/${icon}.svg`, scaledSize: new google.maps.Size(40, 48), anchor: new google.maps.Point(20, 47) } });
             m.addListener('click', () => detail(i.id)); markers.push(m);
         }
@@ -110,7 +135,19 @@ if (dashboard) {
             const p = params(); p.set('page', page);
             const [summary, incidents, notifications] = await Promise.all([api(`/api/v1/dashboard/summary?${p}`), api(`/api/v1/incidents?${p}`), api('/api/v1/notifications')]);
             const cards = document.querySelector('#summary'); cards.replaceChildren();
-            for (const [label, value] of [['Reports', summary.data.total], ['Need action', summary.data.by_status.need_action || 0], ['Done', summary.data.by_status.done || 0]]) { const card = node('div', null, 'panel'); card.append(node('p', label, 'text-sm text-slate-600'), node('p', String(value), 'text-3xl font-bold mt-2')); cards.append(card); }
+            const metrics = [
+                ['Reports', summary.data.total, 'orange', 'All authorized reports', 'M9 5H5v16h14V5h-4M9 3h6v4H9zM8 12h8M8 16h6'],
+                ['Need action', summary.data.by_status.need_action || 0, 'burgundy', 'Reports awaiting action', 'M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01'],
+                ['Done', summary.data.by_status.done || 0, 'green', 'Completed reports', 'M22 11v1a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3'],
+            ];
+            for (const [label, value, tone, caption, path] of metrics) {
+                const card = node('div', null, `stat-card stat-${tone}`), top = node('div', null, 'stat-card-body');
+                const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', width: '42', height: '42', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) icon.setAttribute(key, value);
+                const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', path); icon.append(shape);
+                const number = node('div', null, 'text-right'); number.append(node('p', String(value), 'stat-card-value'), node('p', label, 'stat-card-label'));
+                top.append(icon, number); card.append(top, node('p', caption, 'stat-caption')); cards.append(card);
+            }
             document.querySelector('#unread').textContent = `${notifications.meta?.total ?? notifications.total ?? notifications.data.length} unread notifications`;
             const rows = document.querySelector('#incidents'); rows?.replaceChildren(); latest = incidents.data;
             if (rows && !latest.length) { const tr = node('tr'); const td = node('td', 'No reports match these filters.'); td.colSpan = 6; tr.append(td); rows.append(tr); }
@@ -119,7 +156,8 @@ if (dashboard) {
                 const actions = node('td'); actions.append(button(i.workflow_status === 'done' ? 'Mark as undone' : 'Mark as done', () => action(i.id, i.workflow_status === 'done' ? 'need_action' : 'done')));
                 const location = node('td'); if (i.address) location.append(node('p', i.address));
                 location.append(node('p', `Latitude: ${Number(i.latitude).toFixed(6)} · Longitude: ${Number(i.longitude).toFixed(6)}`, 'text-sm'));
-                tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), location, node('td', reportStatusLabel(i.workflow_status)), actions); rows.append(tr);
+                const status = node('td'); status.append(node('span', reportStatusLabel(i.workflow_status), `status-badge ${i.workflow_status === 'done' ? 'status-done' : 'status-need_action'}`));
+                tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), location, status, actions); rows.append(tr);
             }
             lastPage = incidents.meta.last_page; document.querySelector('#page').textContent = `Page ${page} of ${lastPage}`; document.querySelector('#previous').disabled = page <= 1; document.querySelector('#next').disabled = page >= lastPage;
             document.querySelector('#export').href = `/api/v1/reports/export?${params()}`;
@@ -144,6 +182,7 @@ if (management) {
         'user.created': 'Added account', 'user.updated': 'Updated account', 'user.saved': 'Saved account',
         'content.created': 'Added content', 'content.updated': 'Updated content', 'content.saved': 'Saved content',
         'content.deleted': 'Removed content', 'content.image_updated': 'Updated content image',
+        'page.updated': 'Updated public page',
         'agency.updated': 'Updated agency', 'dispatch.created': 'Added agency routing', 'dispatch.updated': 'Updated agency routing', 'dispatch.saved': 'Saved dispatch rule',
         'message.trash': 'Removed contact message', 'message.restore': 'Restored contact message', 'message.destroy': 'Permanently deleted contact message',
         'incident.created': 'Added incident report', 'incident.test_created': 'Added test incident report', 'incident.status': 'Changed incident status', 'incident.verified': 'Verified incident report', 'incident.assignment': 'Changed incident assignment',

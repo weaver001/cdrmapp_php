@@ -32,7 +32,6 @@
                 <li class="flex gap-2 items-center"><img src="{{ asset('images/map/fire.svg') }}" width="20" height="24" alt=""> Fire Department (BFP) — flame</li>
                 <li class="flex gap-2 items-center"><img src="{{ asset('images/map/police.svg') }}" width="20" height="24" alt=""> Crime / Police Department (PNP) — badge</li>
                 <li class="flex gap-2 items-center"><img src="{{ asset('images/map/mdrrmo.svg') }}" width="20" height="24" alt=""> MDRRMO — rescue cross</li>
-                <li class="flex gap-2 items-center"><img src="{{ asset('images/map/triage.svg') }}" width="20" height="24" alt=""> Needs triage — question mark</li>
             </ul>
             <p id="map-status" role="status" class="text-sm mb-3"></p>
             <div id="map" class="h-96 rounded-lg bg-slate-100" aria-label="Authorized incident map"></div>

@@ -29,6 +29,9 @@ import com.google.maps.android.compose.*
 import org.cdrmapp.citizen.data.Submission
 import org.cdrmapp.citizen.ui.CitizenState
 import org.cdrmapp.citizen.ui.CitizenViewModel
+import org.cdrmapp.citizen.ui.theme.BrandGold
+import org.cdrmapp.citizen.ui.theme.BrandGreen
+import org.cdrmapp.citizen.ui.theme.CdrmTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -36,13 +39,20 @@ import java.util.UUID
 
 class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent {
-  MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF006B45), secondary = Color(0xFF455A64))) {
+  CdrmTheme {
    val vm: CitizenViewModel = viewModel(); val state by vm.state.collectAsStateWithLifecycle()
-   Surface(Modifier.fillMaxSize()) { Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(20.dp)) {
-    Text("CDRMAPP", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-    Text("Citizen incident reporting", style = MaterialTheme.typography.bodyMedium)
-    if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 8.dp))
-    if (state.message.isNotBlank()) Text(state.message, Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.primary)
+   Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(20.dp)) {
+    Surface(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), color = BrandGreen, contentColor = Color.White, shape = MaterialTheme.shapes.medium) {
+     Column(Modifier.padding(16.dp)) {
+      Text("CDRMAPP", style = MaterialTheme.typography.headlineMedium)
+      Text("Citizen incident reporting", style = MaterialTheme.typography.bodyMedium)
+      HorizontalDivider(Modifier.padding(top = 12.dp), thickness = 3.dp, color = BrandGold)
+     }
+    }
+    if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 8.dp), color = MaterialTheme.colorScheme.secondary)
+    if (state.message.isNotBlank()) Surface(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small) {
+     Text(state.message, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSecondaryContainer)
+    }
     if (state.user == null) AuthScreen(vm, state) else CitizenScreen(vm, state)
    } }
   }
@@ -50,8 +60,11 @@ class MainActivity : ComponentActivity() {
  @Composable private fun CitizenScreen(vm: CitizenViewModel, state: CitizenState) {
   var tab by remember { mutableStateOf("Report") }
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-   for (name in listOf("Report", "History", "Profile")) TextButton(onClick = { tab = name }, enabled = !state.busy) { Text(name) }
-   TextButton(onClick = vm::logout, enabled = !state.busy) { Text("Sign out") }
+   for (name in listOf("Report", "History", "Profile")) {
+    if (name == tab) FilledTonalButton(onClick = { tab = name }, enabled = !state.busy) { Text(name) }
+    else TextButton(onClick = { tab = name }, enabled = !state.busy) { Text(name) }
+   }
+   TextButton(onClick = vm::logout, enabled = !state.busy, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) { Text("Sign out") }
   }
   if (state.user?.verifiedAt == null) {
    Text("Verify your email before sending incident reports. Use official emergency channels if you need urgent help.")

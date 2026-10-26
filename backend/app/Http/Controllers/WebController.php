@@ -6,6 +6,7 @@ use App\Models\Agency;
 use App\Models\ContactMessage;
 use App\Models\Content;
 use App\Models\IncidentCategory;
+use App\Models\PublicPage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -15,14 +16,16 @@ class WebController extends Controller
 {
     public function home()
     {
-        return view('public', ['title' => 'Community preparedness starts with clear information', 'type' => 'announcements', 'items' => Content::where('published', true)->where('type', 'announcements')->latest()->limit(10)->get()]);
+        return $this->page('announcements');
     }
 
     public function page(string $type)
     {
         abort_unless(in_array($type, ContentController::TYPES, true), 404);
 
-        return view('public', ['title' => ucwords(str_replace('-', ' ', $type)), 'type' => $type, 'items' => Content::where('published', true)->where('type', $type)->latest()->limit(100)->get()]);
+        $page = PublicPage::forType($type);
+
+        return view('public', ['title' => $page->heading, 'page' => $page, 'type' => $type, 'items' => Content::where('published', true)->where('type', $type)->latest()->limit(100)->get()]);
     }
 
     public function contact(Request $r)
@@ -73,9 +76,12 @@ class WebController extends Controller
     public function manage(string $module)
     {
         Gate::authorize('admin');
+        if ($module === 'cms') {
+            return view('cms', ['counts' => Content::whereIn('type', PublicPage::TYPES)->selectRaw('type, COUNT(*) as total, SUM(CASE WHEN published = 1 THEN 1 ELSE 0 END) as published_count')->groupBy('type')->get()->keyBy('type')]);
+        }
         abort_unless(in_array($module, array_merge(ContentController::TYPES, ['users', 'messages', 'agencies', 'audit']), true), 404);
 
-        return view('manage', ['module' => $module, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
+        return view('manage', ['module' => $module, 'page' => in_array($module, PublicPage::TYPES, true) ? PublicPage::forType($module) : null, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
     }
 
     public function forgot(Request $r)

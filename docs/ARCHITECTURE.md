@@ -38,3 +38,10 @@ For an existing deployment run `php artisan migrate --force` after deploying thi
 Report status is `need_action` or `done`, with reversible staff actions and a recorded history/audit. The Incident accessor and status-query scope normalize older stored states without a destructive migration: resolved/closed/rejected/duplicate are Done, and remaining legacy values are Need action. New reports start at Need action. Verification is independent of completion and continues to control validated heatmap inclusion.
 
 `/dashboard` renders the report table, including address and coordinates, without loading Google Maps or the map overlay. `/incident-map` uses the same authorized filters and paginated report data for agency icons/heatmap, and opens report details from pins. Switching pages preserves the filter query. CSV includes the visible status label and location/coordinates. Infographics is retired and the public home page now shows announcements; historical infographic records and files are preserved.
+
+
+## Page CMS and shared visual theme
+
+`PublicPage` stores the five public pages' small header label, heading, introductory paragraph and contact-form text. Typed content records continue to store repeatable items and images. `/manage/cms` groups the five editors while preserving their existing URLs. Metadata reads are public; settings writes require verified administrator authentication, use an explicit field allowlist, and record audit before/after values. Plain page text is escaped by Blade; item rich text continues through HTMLPurifier. The page migration creates defaults once and seeder reruns do not overwrite edits.
+
+Web CSS design tokens and Android `ui/theme/Theme.kt` share the reference palette. Branding affects surfaces and controls while map marker colors retain their existing agency meaning. Responsive staff navigation collapses on small screens. Native Android light/night resources and API-qualified navigation bar settings accompany the Compose theme.

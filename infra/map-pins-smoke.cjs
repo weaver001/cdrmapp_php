@@ -60,7 +60,7 @@ const assert = require('node:assert/strict');
         });
         await page.goto('http://cdrmapp.test/incident-map');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
-        await page.waitForFunction(() => window.__markers?.length === 16);
+        await page.waitForFunction(() => window.__markers?.length === 15);
         const markers = await page.evaluate(() => window.__markers.map(marker => ({
             title: marker.options.title, icon: marker.options.icon.url,
             size: marker.options.icon.scaledSize, anchor: marker.options.icon.anchor, position: marker.options.position,
@@ -78,7 +78,7 @@ const assert = require('node:assert/strict');
             }
             assert.ok(fs.existsSync(path.join(__dirname, `../backend/public/images/map/${file}.svg`)));
         }
-        assert.equal(markers.find(marker => marker.title.endsWith('synthetic-triage')).icon, '/images/map/triage.svg');
+        assert.equal(markers.find(marker => marker.title.endsWith('synthetic-triage')), undefined, 'Reports awaiting triage must not create map pins.');
         const mapLoads = mapsRequests;
         await page.goto('http://cdrmapp.test/dashboard');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });

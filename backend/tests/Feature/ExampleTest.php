@@ -12,7 +12,7 @@ class ExampleTest extends TestCase
 
     public function test_public_pages_and_staff_session_dashboard(): void
     {
-        $this->get('/')->assertOk()->assertSee('Community preparedness');
+        $this->get('/')->assertOk()->assertSee('<h1>Announcements</h1>', false);
         foreach (['services', 'announcements', 'team-members', 'contact-details', 'faqs'] as $type) {
             $this->get('/pages/'.$type)->assertOk();
         }

@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.CDRMAPP" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/cdrm_accent</item>
+        <item name="android:windowBackground">@color/cdrm_background</item>
+        <item name="android:statusBarColor">@color/cdrm_background</item>
+        <item name="android:navigationBarColor">@color/cdrm_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

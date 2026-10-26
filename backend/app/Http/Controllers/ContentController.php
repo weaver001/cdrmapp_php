@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\ContactMessage;
 use App\Models\Content;
+use App\Models\PublicPage;
 use App\Services\RichText;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Gate;
 
 class ContentController extends Controller
 {
-    public const TYPES = ['announcements', 'services', 'team-members', 'contact-details', 'faqs'];
+    public const TYPES = PublicPage::TYPES;
 
     private function type(string $type): void
     {

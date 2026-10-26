@@ -14,7 +14,7 @@
 | Profile/password/email | No | Own | Own | Own |
 | Incident evidence | No | Own incident | Agency scope | All |
 
-Inactive users are rejected by middleware, including previously issued tokens. Account changes revoke mobile tokens. Password changes/resets revoke tokens and rotate remember tokens. Web forms use Laravel CSRF protection. APIs use policy checks regardless of UI controls. Admin cannot remove their own admin access through account management.
+Inactive users are rejected by middleware, including previously issued tokens. Account changes revoke mobile tokens. Successful password changes/resets revoke all of that account’s mobile tokens, rotate remember tokens, delete its database-backed sessions, and invalidate the current browser session. Browser password changes return to Login; validation failures leave the session intact. Web forms use Laravel CSRF protection. APIs use policy checks regardless of UI controls. Admin cannot remove their own admin access through account management.
 
 ```mermaid
 stateDiagram-v2

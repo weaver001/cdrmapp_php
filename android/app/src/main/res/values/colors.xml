@@ -1,0 +1,6 @@
+<resources>
+    <color name="cdrm_green">#005F35</color>
+    <color name="cdrm_accent">#005F35</color>
+    <color name="cdrm_background">#EEF1F5</color>
+    <color name="cdrm_surface">#FFFFFF</color>
+</resources>

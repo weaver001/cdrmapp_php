@@ -5952,6 +5952,176 @@
           }
         }
       }
+    },
+    "/api/v1/public/pages/{type}": {
+      "get": {
+        "summary": "Read a public page heading and introductory text",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "services",
+                "announcements",
+                "team-members",
+                "faqs",
+                "contact-details"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public page settings. Existing content-item endpoints remain separate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PublicPage"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unsupported page"
+          }
+        }
+      }
+    },
+    "/api/v1/management/pages/{type}": {
+      "get": {
+        "summary": "Read page settings for the CMS editor",
+        "description": "Administrator only; also supports authenticated web sessions with CSRF protection.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "services",
+                "announcements",
+                "team-members",
+                "faqs",
+                "contact-details"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public page settings. Existing content-item endpoints remain separate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PublicPage"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Administrator required"
+          },
+          "404": {
+            "description": "Unsupported page"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update a public page header and introductory text",
+        "description": "Administrator only. Saves immediately and records actor plus before/after values in audit. Page type comes from the path and cannot be reassigned in the payload. Content items and uploads are unchanged.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "services",
+                "announcements",
+                "team-members",
+                "faqs",
+                "contact-details"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicPageSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Public page settings. Existing content-item endpoints remain separate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PublicPage"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Administrator required"
+          },
+          "404": {
+            "description": "Unsupported page"
+          },
+          "422": {
+            "description": "Invalid page settings"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6206,6 +6376,101 @@
           },
           "active": {
             "type": "boolean"
+          }
+        }
+      },
+      "PublicPageSettings": {
+        "type": "object",
+        "required": [
+          "heading"
+        ],
+        "properties": {
+          "eyebrow": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "heading": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "introduction": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 3000,
+            "description": "Plain text; line breaks are preserved."
+          },
+          "form_heading": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 180,
+            "description": "Contact page form heading; required when editing contact-details."
+          },
+          "form_introduction": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Contact page form introductory text."
+          }
+        }
+      },
+      "PublicPage": {
+        "type": "object",
+        "required": [
+          "type",
+          "heading"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "services",
+              "announcements",
+              "team-members",
+              "faqs",
+              "contact-details"
+            ]
+          },
+          "eyebrow": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "heading": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "introduction": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 3000,
+            "description": "Plain text; line breaks are preserved."
+          },
+          "form_heading": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 180,
+            "description": "Contact page form heading; required when editing contact-details."
+          },
+          "form_introduction": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Contact page form introductory text."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
           }
         }
       }

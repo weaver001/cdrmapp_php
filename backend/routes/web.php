@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\WebController;
+use App\Models\PublicPage;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [WebController::class, 'home'])->name('home');
@@ -22,6 +24,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/dashboard', [WebController::class, 'dashboard']);
         Route::get('/incident-map', [WebController::class, 'incidentMap'])->name('incident.map');
         Route::get('/manage/{module}', [WebController::class, 'manage']);
+        Route::patch('/manage/cms/{type}', [PublicPageController::class, 'update'])->whereIn('type', PublicPage::TYPES)->name('cms.page.update');
         Route::get('/profile', fn () => view('profile'));
+        Route::post('/profile/password', [AuthController::class, 'changePassword'])->name('password.update');
     });
 });

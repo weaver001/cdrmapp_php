@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -68,11 +69,17 @@ class AuthController extends Controller
     public function changePassword(Request $r)
     {
         $d = $r->validate(['current_password' => 'required|current_password:sanctum', 'password' => ['required', 'confirmed', PasswordRule::min(12)->letters()->numbers()]]);
-        $r->user()->update(['password' => $d['password']]);
-        $r->user()->tokens()->delete();
-        $r->user()->forceFill(['remember_token' => Str::random(60)])->save();
+        DB::transaction(function () use ($r, $d) {
+            $r->user()->forceFill(['password' => $d['password'], 'remember_token' => Str::random(60)])->save();
+            $this->revokePasswordSessions($r->user());
+        });
+        $this->signOutBrowser($r);
 
-        return ['data' => ['message' => 'Password changed. Sign in again.']];
+        if (! $r->is('api/*') && ! $r->expectsJson()) {
+            return redirect()->route('login');
+        }
+
+        return ['data' => ['message' => 'Password updated. Please sign in again.', 'redirect' => route('login', [], false)]];
     }
 
     public function changeEmail(Request $r)
@@ -128,14 +135,41 @@ class AuthController extends Controller
     {
         $r->validate(['token' => 'required', 'email' => 'required|email', 'password' => ['required', 'confirmed', PasswordRule::min(12)->letters()->numbers()]]);
         $status = Password::reset($r->only('email', 'password', 'password_confirmation', 'token'), function (User $u, string $password) {
-            $u->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
-            $u->tokens()->delete();
+            DB::transaction(function () use ($u, $password) {
+                $u->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
+                $this->revokePasswordSessions($u);
+            });
             event(new PasswordReset($u));
         });
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages(['email' => __($status)]);
         }
 
-        return ['data' => ['message' => 'Password reset.']];
+        $this->signOutBrowser($r);
+
+        return ['data' => ['message' => 'Password updated. Please sign in again.', 'redirect' => route('login', [], false)]];
+    }
+
+    private function revokePasswordSessions(User $user): void
+    {
+        $user->tokens()->delete();
+        if (config('session.driver') === 'database') {
+            DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)->delete();
+        }
+    }
+
+    private function signOutBrowser(Request $request): void
+    {
+        if (! $request->hasSession()) {
+            return;
+        }
+        Auth::guard('web')->logout();
+        // Sanctum may cache the web user for this request. Clear it before the
+        // database session handler attributes the new guest session at response time.
+        Auth::guard('sanctum')->forgetUser();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        $request->session()->flash('status', 'Password updated. Please sign in again.');
     }
 }
