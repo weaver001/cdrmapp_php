@@ -41,4 +41,38 @@ class RepositoryTest {
    assertEquals("synthetic-token", store.get("token")); assertEquals("42", store.get("user_id")); assertTrue(repo.hasSession())
   } finally { server.shutdown() }
  }
+ @Test fun freshLoginAttachesTokenToEveryFollowUpRequestAndDiagnosticsExcludeSecrets() = runBlocking {
+  val server = MockWebServer(); server.start()
+  try {
+   server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":{"user":{"id":42,"name":"Synthetic","email":"citizen@example.test"},"token":"synthetic-secret-token"}}"""))
+   server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":{"id":42,"name":"Synthetic","email":"citizen@example.test"}}"""))
+   server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":[]}"""))
+   server.enqueue(MockResponse().setResponseCode(401).setBody("{}"))
+   val diagnostics = mutableListOf<String>()
+   val repo = Repository(MemoryStore(), server.url("/api/v1/").toString(), diagnostics::add)
+   repo.login("citizen@example.test", "synthetic-password")
+   assertEquals(42L, repo.api.me().data.id)
+   assertTrue(repo.api.categories().data.isEmpty())
+   try { repo.api.incidents(1); fail("Expected unauthorized history request") } catch (e: HttpException) { assertEquals(401, e.code()) }
+   assertNull(server.takeRequest().getHeader("Authorization"))
+   repeat(3) { assertEquals("Bearer synthetic-secret-token", server.takeRequest().getHeader("Authorization")) }
+   assertTrue(diagnostics.last().contains("/api/v1/incidents status=401 tokenSaved=true bearerSent=true"))
+   for (line in diagnostics) {
+    assertFalse(line.contains("synthetic-secret-token")); assertFalse(line.contains("synthetic-password")); assertFalse(line.contains("citizen@example.test")); assertFalse(line.contains("?page="))
+   }
+  } finally { server.shutdown() }
+ }
+ @Test fun unreadableSavedTokenIsReportedAsStorageFailureBeforeAuthenticatedRequests() = runBlocking {
+  val server = MockWebServer(); server.start()
+  try {
+   server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":{"user":{"id":42,"name":"Synthetic","email":"citizen@example.test"},"token":"synthetic-token"}}"""))
+   val store = object : SecretStorage {
+    override fun put(name: String, value: String?) {}
+    override fun get(name: String): String? = null
+   }
+   val repo = Repository(store, server.url("/api/v1/").toString())
+   try { repo.login("citizen@example.test", "synthetic-password"); fail("Unreadable session must fail") } catch (_: SessionStorageException) {}
+   assertFalse(repo.hasSession()); assertEquals(1, server.requestCount)
+  } finally { server.shutdown() }
+ }
 }

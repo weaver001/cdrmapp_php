@@ -6,19 +6,32 @@ import retrofit2.converter.gson.GsonConverterFactory
 import org.cdrmapp.citizen.BuildConfig
 import java.util.concurrent.TimeUnit
 
-class Repository(private val store: SecretStorage, baseUrl: String = BuildConfig.API_BASE_URL) {
+class SessionStorageException : IllegalStateException("Could not persist the secure session.")
+
+class Repository(private val store: SecretStorage, baseUrl: String = BuildConfig.API_BASE_URL, private val diagnostic: (String) -> Unit = {}) {
  private val gson = Gson()
  private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).addInterceptor { chain ->
   val request = chain.request().newBuilder().header("Accept", "application/json")
-  store.get("token")?.let { request.header("Authorization", "Bearer $it") }
-  chain.proceed(request.build())
+  val token = store.get("token")
+  token?.let { request.header("Authorization", "Bearer $it") }
+  val outgoing = request.build()
+  val response = chain.proceed(outgoing)
+  // Log only routing/status flags. Never log headers, bodies, query strings or token values.
+  diagnostic("${outgoing.method} ${outgoing.url.host}${outgoing.url.encodedPath} status=${response.code} tokenSaved=${token != null} bearerSent=${response.request.header("Authorization") != null} finalHost=${response.request.url.host}")
+  response
  }.build()
  val api: CdrmApi = Retrofit.Builder().baseUrl(baseUrl).client(client).addConverterFactory(GsonConverterFactory.create(gson)).build().create(CdrmApi::class.java)
  fun hasSession() = store.get("token") != null
  suspend fun login(email: String, password: String): Citizen {
   val result = api.login(mapOf("email" to email, "password" to password, "device_name" to "Android citizen")).data
-  require(result.user.id > 0)
-  store.put("token", result.token); store.put("user_id", result.user.id.toString())
+  require(result.user.id > 0 && result.token.isNotBlank())
+  try {
+   store.put("token", result.token); store.put("user_id", result.user.id.toString())
+   if (store.get("token") != result.token || store.get("user_id") != result.user.id.toString()) throw SessionStorageException()
+  } catch (_: Exception) {
+   runCatching { clearSession() }
+   throw SessionStorageException()
+  }
   return result.user
  }
  fun pending(): Submission? = store.get("pending_" + store.get("user_id"))?.let { gson.fromJson(it, Submission::class.java) }

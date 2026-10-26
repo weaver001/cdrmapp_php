@@ -1,5 +1,7 @@
 package org.cdrmapp.citizen.ui
 import android.app.Application
+import android.util.Log
+import org.cdrmapp.citizen.BuildConfig
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,7 +12,7 @@ import retrofit2.HttpException
 
 data class CitizenState(val user: Citizen? = null, val categories: List<Category> = emptyList(), val incidents: List<Incident> = emptyList(), val detail: Incident? = null, val pending: Submission? = null, val page: Int = 1, val lastPage: Int = 1, val busy: Boolean = false, val message: String = "", val authMode: String = "Sign in")
 class CitizenViewModel(application: Application) : AndroidViewModel(application) {
- private val repo = Repository(SecureStore(application))
+ private val repo = Repository(SecureStore(application), diagnostic = { if (BuildConfig.DEBUG) Log.d("CDRMAPP_AUTH", it) })
  private val mutable = MutableStateFlow(CitizenState())
  val state = mutable.asStateFlow()
  init { if (repo.hasSession()) run { refreshInternal() } }
@@ -21,7 +23,7 @@ class CitizenViewModel(application: Application) : AndroidViewModel(application)
    try { action() } catch (e: Exception) {
     if (e is kotlinx.coroutines.CancellationException) throw e
     if (e is HttpException && e.code() == 401) { repo.clearSession(); mutable.value = mutable.value.copy(user = null) }
-    val message = if (e is HttpException) when(e.code()) { 401 -> "Session expired. Sign in again."; 403 -> "Verify your email or check your account access."; 422 -> "Please check the submitted fields. Passwords require 12 characters, letters and numbers. GPS must be fresh."; 409 -> "The saved retry conflicts with a previous request. Contact support with your report reference."; 429 -> "Too many requests. Wait briefly before retrying."; else -> "Server error. Delivery is unconfirmed; retry the saved submission." } else "Connection failed. Delivery is unconfirmed. Your saved report can be retried."
+    val message = if (e is SessionStorageException) "This device could not save your secure session. Restart the app and sign in again." else if (e is HttpException) when(e.code()) { 401 -> "Session expired. Sign in again."; 403 -> "Verify your email or check your account access."; 422 -> "Please check the submitted fields. Passwords require 12 characters, letters and numbers. GPS must be fresh."; 409 -> "The saved retry conflicts with a previous request. Contact support with your report reference."; 429 -> "Too many requests. Wait briefly before retrying."; else -> "Server error. Delivery is unconfirmed; retry the saved submission." } else "Connection failed. Delivery is unconfirmed. Your saved report can be retried."
     mutable.value = mutable.value.copy(message = message, pending = repo.pending())
    } finally { mutable.value = mutable.value.copy(busy = false) }
   }
