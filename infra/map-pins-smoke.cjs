@@ -14,11 +14,12 @@ const assert = require('node:assert/strict');
         page.on('pageerror', error => errors.push(error.message));
         const reports = Array.from({ length: 15 }, (_, index) => ({
             id: index + 1, agency: { type: ['FIRE', 'PNP', 'MDRRMO'][Math.floor(index / 5)], name: ['Fire Department (BFP)', 'Police Department (PNP)', 'MDRRMO'][Math.floor(index / 5)] },
+            agency_id: Math.floor(index / 5) + 1, assigned_officer_id: 501 + Math.floor(index / 5),
             public_reference: `synthetic-${index + 1}`, received_at: '2026-10-26T00:00:00Z',
             latitude: 14.806 + index * 0.001, longitude: 121.039 + index * 0.002,
             description: '[TEST REPORT] Synthetic map fixture', workflow_status: 'need_action', is_test: true,
         }));
-        reports.push({ ...reports[0], id: 16, agency: null, public_reference: 'synthetic-triage' });
+        reports.push({ ...reports[0], id: 16, agency: null, agency_id: null, assigned_officer_id: null, public_reference: 'synthetic-triage' });
         await page.route('**/*', async route => {
             const url = new URL(route.request().url());
             if (url.hostname === 'maps.googleapis.com') {
@@ -28,13 +29,18 @@ const assert = require('node:assert/strict');
                     window.google = { maps: {
                         Map: class {}, Size: class { constructor(width,height) { Object.assign(this,{width,height}); } },
                         Point: class { constructor(x,y) { Object.assign(this,{x,y}); } },
-                        Marker: class { constructor(options) { this.options=options;window.__markers.push(this); } addListener() {} setMap(map) { this.options.map=map; } }
+                        Marker: class { constructor(options) { this.options=options;this.listeners={};window.__markers.push(this); } addListener(name,callback) {this.listeners[name]=callback;} setMap(map) { this.options.map=map; } }
                     }};
                     window.cdrmMapReady();
                 ` });
             }
             assert.equal(url.hostname, 'cdrmapp.test');
             if (url.pathname.endsWith('/map-overlay')) return route.fulfill({ contentType: 'application/javascript', body: 'export class GoogleMapsOverlay {setMap() {} setProps() {}} export class HeatmapLayer {}' });
+            if (/\/incidents\/\d+$/.test(url.pathname)) return route.fulfill({ json: { data: { ...reports.find(report => report.id === Number(url.pathname.split('/').at(-1))), histories: [], responses: [], attachments: [] } } });
+            if (url.pathname.endsWith('/officers')) {
+                const agency = Number(url.searchParams.get('agency_id'));
+                return route.fulfill({ json: { data: [{ id: 500 + agency, name: `Synthetic officer ${agency}` }] } });
+            }
             if (url.pathname.endsWith('/status')) {
                 const body = route.request().postDataJSON();
                 assert.deepEqual(Object.keys(body), ['status']);
@@ -51,12 +57,13 @@ const assert = require('node:assert/strict');
             const mapView = url.pathname === '/incident-map';
             return route.fulfill({ contentType: 'text/html', body: `<meta name="csrf-token" content="synthetic">
                 <div id="dashboard" ${mapView ? 'data-map-key="synthetic"' : ''} data-role="admin">
-                <form id="filters"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
+                <form id="filters"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><select name="agency_id"><option value="">All authorized</option><option value="1">Fire Department (BFP)</option><option value="2">Police Department (PNP)</option><option value="3">MDRRMO</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
                 <span id="page"></span><button id="previous"></button><button id="next"></button>
                 <a id="switch-view" href="${mapView ? '/dashboard' : '/incident-map'}"></a><a id="export"></a><button id="print"></button><button id="refresh"></button>
                 ${mapView ? `
                 <input type="checkbox" id="show-pins" checked><input type="checkbox" id="exploratory">
-                <p id="map-status"></p><div id="map"></div>` : '<table><tbody id="incidents"></tbody></table>'}</div>` });
+                <p id="map-status"></p><div id="map"></div>` : '<table><tbody id="incidents"></tbody></table>'}
+                <dialog id="incident-detail"><form method="dialog"><button>Close</button></form><div id="detail-body"></div></dialog></div>` });
         });
         await page.goto('http://cdrmapp.test/incident-map');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
@@ -79,6 +86,17 @@ const assert = require('node:assert/strict');
             assert.ok(fs.existsSync(path.join(__dirname, `../backend/public/images/map/${file}.svg`)));
         }
         assert.equal(markers.find(marker => marker.title.endsWith('synthetic-triage')), undefined, 'Reports awaiting triage must not create map pins.');
+        await page.evaluate(() => window.__markers.find(marker => marker.options.map && marker.options.title.endsWith('synthetic-1')).listeners.click());
+        await page.locator('#incident-detail[open]').waitFor();
+        const routedAgency = page.getByLabel('Routed agency', { exact: true });
+        assert.equal(await routedAgency.inputValue(), '1', 'The current report agency must be selected.');
+        assert.deepEqual(await routedAgency.locator('option:not([disabled])').allTextContents(), ['Fire Department (BFP)', 'Police Department (PNP)', 'MDRRMO']);
+        assert.ok(!(await routedAgency.textContent()).includes('Needs triage'));
+        assert.equal(await routedAgency.getAttribute('required'), '');
+        await routedAgency.selectOption('2');
+        await page.getByLabel('Assigned officer', { exact: true }).locator('option[value="502"]').waitFor({ state: 'attached' });
+        assert.equal(await page.getByLabel('Assigned officer', { exact: true }).inputValue(), '');
+        await page.getByRole('button', { name: 'Close', exact: true }).click();
         for (const index of [0, 5, 10]) reports[index].workflow_status = 'done';
         await page.locator('#refresh').click();
         await page.waitForFunction(() => window.__markers.filter(marker => marker.options.map && marker.options.icon.url.endsWith('-done.svg')).length === 3);

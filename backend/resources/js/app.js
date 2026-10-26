@@ -122,8 +122,24 @@ if (dashboard) {
                 try { await api(`/api/v1/incidents/${i.id}/responses`, 'POST', { note, occurred_at: new Date().toISOString() }); await detail(i.id); } catch (e) { message.textContent = e.message; }
             }));
             const assignment = node('form',null,'grid gap-3 mt-5'); const officerLabel=node('label','Assigned officer');const officer=node('select');officer.name='assigned_officer_id';officerLabel.append(officer);
-            const agencyLabel=node('label','Routed agency');const agency=document.querySelector('#filters select[name=agency_id]').cloneNode(true);agency.options[0].textContent='Needs triage';agency.value=i.agency_id??'';agencyLabel.append(agency);
-            async function listOfficers(){officer.replaceChildren(node('option','Unassigned'));officer.options[0].value='';const result=await api('/api/v1/officers'+(agency.value?'?agency_id='+agency.value:''));for(const user of result.data){const option=node('option',user.name);option.value=user.id;officer.append(option);}officer.value=i.assigned_officer_id??'';}
+            officer.setAttribute('aria-label', 'Assigned officer');
+            const agencyLabel = node('label', 'Routed agency');
+            const agency = document.querySelector('#filters select[name=agency_id]').cloneNode(true);
+            agency.setAttribute('aria-label', 'Routed agency');
+            for (const option of [...agency.options]) if (!option.value) option.remove();
+            const placeholder = node('option', 'Select agency');
+            placeholder.value = ''; placeholder.disabled = true; placeholder.hidden = true;
+            agency.prepend(placeholder); agency.required = true;
+            agency.value = i.agency_id == null ? '' : String(i.agency_id);
+            agencyLabel.append(agency);
+            async function listOfficers() {
+                officer.replaceChildren(node('option', 'Unassigned')); officer.options[0].value = '';
+                if (!agency.value) return;
+                const result = await api('/api/v1/officers?agency_id=' + agency.value);
+                for (const user of result.data) { const option = node('option', user.name); option.value = user.id; officer.append(option); }
+                const assigned = i.assigned_officer_id == null ? '' : String(i.assigned_officer_id);
+                officer.value = [...officer.options].some(option => option.value === assigned) ? assigned : '';
+            }
             if(dashboard.dataset.role==='admin'){assignment.append(agencyLabel);agency.onchange=listOfficers;}assignment.append(officerLabel);await listOfficers();
             const noteLabel=node('label','Assignment / rerouting reason');const note=node('textarea');note.required=true;note.maxLength=2000;noteLabel.append(note);assignment.append(noteLabel);const save=node('button','Save assignment','btn');save.type='submit';assignment.append(save);assignment.onsubmit=async event=>{event.preventDefault();try{await api(`/api/v1/incidents/${i.id}/assign`,'POST',{assigned_officer_id:officer.value?Number(officer.value):null,...(dashboard.dataset.role==='admin'?{agency_id:agency.value?Number(agency.value):null}:{}),note:note.value});await detail(i.id);await load();}catch(error){message.textContent=error.message;}};body.append(assignment);
             const notices=await api('/api/v1/notifications');await Promise.all(notices.data.filter(n=>n.data.incident_id===i.id).map(n=>api(`/api/v1/notifications/${n.id}/read`,'POST',{})));

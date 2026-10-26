@@ -2,7 +2,7 @@
 @section('content')
 <div id="dashboard" data-role="{{ auth()->user()->role }}" @if($mapOnly) data-map-key="{{ config('services.google_maps.web_key') }}" @endif>
     <div class="flex justify-between gap-4 items-start">
-        <div><p class="text-emerald-800 font-semibold">Operations overview</p><h1 class="text-3xl font-bold">{{ $mapOnly ? 'Incident map' : 'Incident dashboard' }}</h1><p class="text-slate-600 mt-2">{{ auth()->user()->role==='admin' ? 'All agencies, including reports awaiting triage' : 'Your assigned agency only' }}</p></div>
+        <div><p class="text-emerald-800 font-semibold">Operations overview</p><h1 class="text-3xl font-bold">{{ $mapOnly ? 'Incident map' : 'Incident dashboard' }}</h1><p class="text-slate-600 mt-2">{{ auth()->user()->role==='admin' ? 'All agencies' : 'Your assigned agency only' }}</p></div>
         <span id="unread" class="badge">Loading notifications…</span>
     </div>
     <p id="dashboard-status" role="status" class="my-4 text-sm">Loading the latest reports…</p>
