@@ -94,4 +94,42 @@ class CompletionNotesTest extends TestCase
         $this->assertDatabaseCount('incident_status_histories', 0);
         Notification::assertNothingSent();
     }
+
+    public function test_csv_includes_all_response_notes_in_one_cell_with_authors_and_utc_times(): void
+    {
+        $report = $this->report();
+        $withoutNotes = $this->report();
+        $excluded = $this->report();
+        $excluded->update(['description' => 'Excluded fixture']);
+        $actor = User::factory()->create(['role' => 'admin', 'name' => 'Synthetic, "Responder"']);
+        $earlierNote = "=SYNTHETIC(), assistance completed\nSecond line with \"quotes\".";
+        $laterNote = 'SYNTHETIC follow-up completed.';
+        IncidentResponse::create(['incident_id' => $report->id, 'officer_id' => $actor->id, 'note' => $laterNote, 'occurred_at' => now(), 'outcome' => 'Done']);
+        $earlier = IncidentResponse::create(['incident_id' => $report->id, 'officer_id' => $actor->id, 'note' => $earlierNote, 'occurred_at' => now()->subMinute(), 'outcome' => 'Done']);
+        IncidentResponse::create(['incident_id' => $excluded->id, 'officer_id' => $actor->id, 'note' => 'MUST NOT EXPORT', 'occurred_at' => now()]);
+        Sanctum::actingAs($actor);
+        $csv = $this->get('/api/v1/reports/export?q=SYNTHETIC%20completion%20test')->assertOk()->streamedContent();
+        $stream = fopen('php://temp', 'w+');
+        fwrite($stream, $csv);
+        rewind($stream);
+        $rows = [];
+        while (($row = fgetcsv($stream, null, ',', '"', '')) !== false) {
+            $rows[] = $row;
+        }
+        fclose($stream);
+        $this->assertCount(5, $rows, 'Multiline response notes must not create extra report rows.');
+        $headers = $rows[2];
+        $first = array_combine($headers, $rows[3]);
+        $second = array_combine($headers, $rows[4]);
+        $this->assertSame($report->public_reference, $first['Reference']);
+        $this->assertStringContainsString($earlierNote, $first['Response notes']);
+        $this->assertStringContainsString($laterNote, $first['Response notes']);
+        $this->assertStringContainsString($actor->name, $first['Response notes']);
+        $this->assertStringContainsString($earlier->occurred_at->toISOString(), $first['Response notes']);
+        $this->assertLessThan(strpos($first['Response notes'], $laterNote), strpos($first['Response notes'], $earlierNote));
+        $this->assertStringStartsWith('[', $first['Response notes'], 'Note content must not become a spreadsheet formula.');
+        $this->assertSame($withoutNotes->public_reference, $second['Reference']);
+        $this->assertSame('', $second['Response notes']);
+        $this->assertStringNotContainsString('MUST NOT EXPORT', $csv);
+    }
 }

@@ -59,9 +59,10 @@ class AnalyticsController extends Controller
             };
             $write(['Created UTC', now()->toISOString(), 'Authorized user ID', $r->user()->id]);
             $write(['Filters', json_encode($r->query())]);
-            $write(['Reference', 'Agency ID', 'Agency', 'Status', 'Received UTC', 'Description', 'Location', 'Latitude', 'Longitude']);
-            foreach ($q->with('agency')->lazyById(500) as $i) {
-                $write([$i->public_reference, $i->agency_id, $i->agency?->name ?? 'Needs triage', IncidentWorkflow::STATUSES[$i->workflow_status], $i->received_at->toISOString(), $i->description, $i->address, $i->latitude, $i->longitude]);
+            $write(['Reference', 'Agency ID', 'Agency', 'Status', 'Received UTC', 'Description', 'Location', 'Latitude', 'Longitude', 'Response notes']);
+            foreach ($q->with(['agency', 'responses' => fn ($responses) => $responses->orderBy('occurred_at')->orderBy('id'), 'responses.officer:id,name'])->lazyById(500) as $i) {
+                $notes = $i->responses->map(fn ($response) => '['.$response->occurred_at->toISOString().'] '.($response->officer?->name ?? 'Staff #'.$response->officer_id).': '.$response->note)->implode("\n\n");
+                $write([$i->public_reference, $i->agency_id, $i->agency?->name ?? 'Needs triage', IncidentWorkflow::STATUSES[$i->workflow_status], $i->received_at->toISOString(), $i->description, $i->address, $i->latitude, $i->longitude, $notes]);
             }fclose($f);
         }, 'incidents.csv', ['Content-Type' => 'text/csv']);
     }
