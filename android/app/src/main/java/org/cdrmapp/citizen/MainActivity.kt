@@ -102,6 +102,13 @@ class MainActivity : ComponentActivity() {
   var accuracy by remember { mutableStateOf<Float?>(null) }; var observedAt by remember { mutableStateOf<String?>(null) }
   var locationMessage by remember { mutableStateOf("Tap the map to choose the incident location, or request your current location.") }
   var confirmSaved by remember { mutableStateOf(false) };var confirmation by remember { mutableStateOf(false) }; var locating by remember { mutableStateOf(false) }
+  LaunchedEffect(state.pending?.key) {
+   state.pending?.let { saved ->
+    description = saved.description; categoryId = saved.categoryId
+    position = LatLng(saved.latitude, saved.longitude); source = saved.source
+    accuracy = saved.accuracy; observedAt = saved.observedAt
+   }
+  }
   fun requestLocation() {
    val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
    if (!granted) { locationMessage = "Location permission denied. Choose a manual incident location on the map."; return }
@@ -118,6 +125,7 @@ class MainActivity : ComponentActivity() {
   val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { requestLocation() }
   Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
    Text("Report an incident", style = MaterialTheme.typography.headlineSmall)
+   Text("Reporting coverage: San Jose del Monte, Bulacan only. Select the actual incident location.")
    Text("For urgent help, use official emergency hotlines. Sending a report does not guarantee a response.")
    if (state.pending != null) {
     Card { Column(Modifier.padding(16.dp)) {

@@ -101,4 +101,27 @@ class RepositoryTest {
    repeat(2) { assertEquals("/api/v1/incidents?page=1", server.takeRequest().path) }
   } finally { server.shutdown() }
  }
+ @Test fun outsideCoverageRejectionAllowsEditingWhileOtherFailuresRetainTheRetryPayload() = runBlocking {
+  val server = MockWebServer(); server.start()
+  try {
+   val store = MemoryStore().apply { put("user_id", "42"); put("token", "synthetic-token") }
+   val repo = Repository(store, server.url("/api/v1/").toString())
+   val message = "This incident location is outside our coverage area. Reports are accepted only within San Jose del Monte, Bulacan."
+   val response = """{"error":{"message":"Validation failed","fields":{"location":["$message"]}}}"""
+   server.enqueue(MockResponse().setResponseCode(422).setBody(response))
+   try { repo.send(submission); fail("Outside location must be rejected") } catch (e: OutsideCoverageException) { assertEquals(message, e.message) }
+   assertNull(repo.pending())
+   server.takeRequest()
+   repo.persist(submission)
+   server.enqueue(MockResponse().setResponseCode(404).setBody("{}"))
+   server.enqueue(MockResponse().setResponseCode(422).setBody(response))
+   try { repo.send(submission); fail("Saved outside location must be rejected") } catch (_: OutsideCoverageException) {}
+   assertNull(repo.pending())
+   assertTrue(server.takeRequest().path!!.startsWith("/api/v1/incidents/receipt/"))
+   server.takeRequest()
+   server.enqueue(MockResponse().setResponseCode(422).setBody("""{"error":{"fields":{"location_source":["GPS is stale"]}}}"""))
+   try { repo.send(submission); fail("Stale GPS must be rejected") } catch (_: HttpException) {}
+   assertEquals(submission, repo.pending())
+  } finally { server.shutdown() }
+ }
 }

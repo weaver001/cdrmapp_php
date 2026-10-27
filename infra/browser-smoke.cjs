@@ -5,7 +5,7 @@ const {chromium,request}=require('../backend/node_modules/playwright');const fs=
  async function token(role){const r=await client.post('/api/v1/auth/login',{data:credentials[role]});assert.equal(r.status(),200);return (await r.json()).data.token;}
  const citizen=await token('citizen');const fire=await token('FIRE');const pnp=await token('PNP');const auth=t=>({Authorization:`Bearer ${t}`,Accept:'application/json'});
  const cats=await (await client.get('/api/v1/incident-categories',{headers:auth(citizen)})).json();const category=cats.data.find(x=>x.name==='Fire Department (BFP)');
- const payload={category_id:category.id,description:'SYNTHETIC BROWSER TEST: no real emergency. Smoke report for local verification only.',latitude:14.5995,longitude:120.9842,location_source:'manual',idempotency_key:require('crypto').randomUUID()};
+ const payload={category_id:category.id,description:'SYNTHETIC BROWSER TEST: no real emergency. Smoke report for local verification only.',latitude:14.8139,longitude:121.0453,location_source:'manual',idempotency_key:require('crypto').randomUUID()};
  const sent=await client.post('/api/v1/incidents',{headers:auth(citizen),data:payload});assert.equal(sent.status(),201);const incident=(await sent.json()).data;require('child_process').execFileSync('docker',['compose','-f',path.join(root,'infra/compose.yaml'),'run','--rm','web','php','tests/Browser/mark-synthetic.php'],{stdio:'pipe'});
  const retry=await client.post('/api/v1/incidents',{headers:auth(citizen),data:payload});assert.equal(retry.status(),200);assert.equal((await retry.json()).data.id,incident.id);
  assert.equal((await client.get(`/api/v1/incidents/${incident.id}`,{headers:auth(fire)})).status(),200);

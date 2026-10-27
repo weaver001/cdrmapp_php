@@ -35,7 +35,7 @@ class IncidentWorkflowTest extends TestCase
 
     private function payload(?IncidentCategory $c = null): array
     {
-        return ['category_id' => ($c ?? $this->category())->id, 'description' => 'SYNTHETIC TEST: smoke visible near an empty building.', 'latitude' => 14.5995, 'longitude' => 120.9842, 'location_source' => 'manual', 'idempotency_key' => (string) Str::uuid()];
+        return ['category_id' => ($c ?? $this->category())->id, 'description' => 'SYNTHETIC TEST: smoke visible near an empty building.', 'latitude' => 14.8139, 'longitude' => 121.0453, 'location_source' => 'manual', 'idempotency_key' => (string) Str::uuid()];
     }
 
     public function test_submission_is_durable_idempotent_and_scoped(): void

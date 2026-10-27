@@ -1,5 +1,6 @@
 package org.cdrmapp.citizen.data
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -8,6 +9,7 @@ import java.util.concurrent.TimeUnit
 
 class SessionStorageException : IllegalStateException("Could not persist the secure session.")
 class InvalidCredentialsException : IllegalArgumentException("Incorrect Username/Password")
+class OutsideCoverageException(message: String) : IllegalArgumentException(message)
 
 class Repository(private val store: SecretStorage, baseUrl: String = BuildConfig.API_BASE_URL, private val diagnostic: (String) -> Unit = {}) {
  private val gson = Gson()
@@ -49,7 +51,21 @@ class Repository(private val store: SecretStorage, baseUrl: String = BuildConfig
    if(existing != null) { clearPending();return existing }
   }
   persist(submission) // The original payload/key survives timeouts and process death.
-  val result = api.submit(submission).data
+  val result = try {
+   api.submit(submission).data
+  } catch (e: retrofit2.HttpException) {
+   val coverageMessage = if (e.code() == 422) runCatching {
+    gson.fromJson(e.response()?.errorBody()?.string(), JsonObject::class.java)
+     ?.getAsJsonObject("error")?.getAsJsonObject("fields")?.getAsJsonArray("location")?.firstOrNull()?.asString
+   }.getOrNull() else null
+   if (!coverageMessage.isNullOrBlank()) {
+    // The server definitively rejected this location; it is safe to allow editing.
+    // Timeouts and other validation errors retain the exact saved retry payload.
+    clearPending()
+    throw OutsideCoverageException(coverageMessage)
+   }
+   throw e
+  }
   clearPending() // Only clear after the server acknowledges durable receipt.
   return result
  }

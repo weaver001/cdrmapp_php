@@ -5,6 +5,7 @@
 /backend/public/build/
 /android/local.properties
 /android/.gradle/
+/android/.kotlin/
 /android/**/build/
 *.jks
 *.keystore

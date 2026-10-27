@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Dispatch;
 use App\Services\IncidentFilters;
 use App\Services\IncidentWorkflow;
+use App\Services\SjdmCoverage;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -44,7 +45,7 @@ class IncidentController extends Controller
         return new IncidentResource($incident->load(['agency', 'category', 'histories', 'responses.officer:id,name', 'reporter', 'attachments']));
     }
 
-    public function store(Request $r, IncidentWorkflow $flow)
+    public function store(Request $r, IncidentWorkflow $flow, SjdmCoverage $coverage)
     {
         abort_unless($r->user()->role === 'citizen', 403, 'Only citizens may submit incidents.');
         $d = $r->validate(['category_id' => ['required', 'integer', Rule::exists('incident_categories', 'id')->where('active', true)], 'description' => 'required|string|min:5|max:5000', 'latitude' => 'required|numeric|between:-90,90', 'longitude' => 'required|numeric|between:-180,180', 'accuracy_m' => 'nullable|numeric|min:0|max:100000', 'location_source' => 'required|in:gps,manual', 'location_observed_at' => 'required_if:location_source,gps|nullable|date|before_or_equal:now', 'address' => 'nullable|string|max:255', 'incident_at' => 'nullable|date|before_or_equal:now', 'idempotency_key' => 'required|uuid']);
@@ -54,6 +55,9 @@ class IncidentController extends Controller
         $existing = Incident::where('reporter_id', $r->user()->id)->where('idempotency_key', $d['idempotency_key'])->first();
         if ($existing) {
             return $this->replay($existing, $hash);
+        }
+        if (! $coverage->contains((float) $d['latitude'], (float) $d['longitude'])) {
+            throw ValidationException::withMessages(['location' => SjdmCoverage::MESSAGE]);
         }
         if ($d['location_source'] === 'gps' && (empty($d['accuracy_m']) || Carbon::parse($d['location_observed_at'])->lt(now()->subMinutes(5)))) {
             throw ValidationException::withMessages(['location_source' => 'GPS must be fresh with accuracy metadata. Choose a manual map pin if unavailable.']);
