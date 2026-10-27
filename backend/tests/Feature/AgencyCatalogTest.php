@@ -79,7 +79,7 @@ class AgencyCatalogTest extends TestCase
         $this->assertSame('Custom rescue category', $custom->fresh()->name);
     }
 
-    public function test_csv_contains_canonical_agency_names_and_keeps_officer_scope(): void
+    public function test_only_admins_can_generate_reports_and_officers_retain_scoped_incident_access(): void
     {
         $reporter = User::factory()->create();
         foreach (Agency::inDisplayOrder()->get() as $agency) {
@@ -92,13 +92,18 @@ class AgencyCatalogTest extends TestCase
         foreach (self::LABELS as $label) {
             $this->assertStringContainsString($label, $csv);
         }
-        $fire = Agency::where('type', 'FIRE')->firstOrFail();
-        $officer = User::factory()->create();
-        $officer->forceFill(['role' => 'officer', 'agency_id' => $fire->id])->save();
-        Sanctum::actingAs($officer);
-        $csv = $this->get('/api/v1/reports/export')->assertOk()->streamedContent();
-        $this->assertStringContainsString('Fire Department (BFP)', $csv);
-        $this->assertStringNotContainsString('Police Department (PNP)', $csv);
-        $this->assertStringNotContainsString('MDRRMO', $csv);
+        $this->getJson('/api/v1/reports')->assertOk()->assertJsonCount(3, 'data');
+        $this->actingAs($admin)->get('/dashboard')->assertOk()->assertSee('id="export"', false)->assertSee('id="print"', false);
+        foreach (Agency::inDisplayOrder()->get() as $agency) {
+            $officer = User::factory()->create(['role' => 'officer', 'agency_id' => $agency->id]);
+            $this->actingAs($officer);
+            Sanctum::actingAs($officer);
+            $this->getJson('/api/v1/reports')->assertForbidden();
+            $this->get('/api/v1/reports/export')->assertForbidden();
+            $this->get('/dashboard')->assertOk()->assertDontSee('id="export"', false)->assertDontSee('id="print"', false)->assertSee('Response watchlist');
+            $this->get('/incident-map')->assertOk()->assertDontSee('id="export"', false)->assertDontSee('id="print"', false);
+            $own = $this->getJson('/api/v1/incidents')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.agency_id', $agency->id)->json('data.0');
+            $this->patchJson('/api/v1/incidents/'.$own['id'].'/status', ['status' => 'done'])->assertOk()->assertJsonPath('data.workflow_status', 'done');
+        }
     }
 }

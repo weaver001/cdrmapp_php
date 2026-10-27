@@ -49,6 +49,8 @@ Reference: [Laravel Cloud Object Storage](https://cloud.laravel.com/docs/resourc
 
 ## Simplified reports and module removal deployment
 
+Report generation is administrator-only: `/api/v1/reports` and `/api/v1/reports/export` require the active admin permission. CSV export and the application's print control are shown only to administrators on the dashboard and incident map. Fire, Police and MDRRMO officers retain their agency-scoped `/api/v1/incidents` access, operational dashboard/map, and authorized response/status actions. Deploy backend code and rebuilt web assets together; this permission change requires no migration or Android rebuild.
+
 Deploy the updated PHP code and frontend build together. No new database migration is required for this revision. Reports show Done/Need action, with reversible Mark as done/Mark as undone actions. Legacy resolved, closed, rejected and duplicate rows read as Done; other legacy states read as Need action. Historical rows/status history are not bulk-rewritten. CSV now includes status labels and location/coordinates.
 
 Use **Incident dashboard** (`/dashboard`) for reports and **Map & heatmap** (`/incident-map`) for the separate map. Filters are shared and carried across when switching pages. Dispatch Rules and Infographics management/API/public routes are removed. New reports route directly to their category's active agency, ignoring old dispatch settings. Old rule and infographic data remains stored for history/rollback. The public homepage now displays announcements.

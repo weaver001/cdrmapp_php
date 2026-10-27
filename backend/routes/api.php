@@ -46,8 +46,8 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
             Route::get('dashboard/summary', [AnalyticsController::class, 'summary']);
             Route::get('analytics/heatmap', [AnalyticsController::class, 'heatmap']);
             Route::get('analytics/trends', [AnalyticsController::class, 'trends']);
-            Route::get('reports', [IncidentController::class, 'index'])->middleware('can:staff');
-            Route::get('reports/export', [AnalyticsController::class, 'export']);
+            Route::get('reports', [IncidentController::class, 'index'])->middleware('can:admin');
+            Route::get('reports/export', [AnalyticsController::class, 'export'])->middleware('can:admin');
             Route::get('management/users', [ManagementController::class, 'users']);
             Route::get('management/pages/{type}', [PublicPageController::class, 'show'])->whereIn('type', PublicPage::TYPES);
             Route::patch('management/pages/{type}', [PublicPageController::class, 'update'])->whereIn('type', PublicPage::TYPES);

@@ -17,11 +17,13 @@
     </form>
     <div class="flex flex-wrap gap-3 mb-3 print:hidden">
         <a id="switch-view" class="btn-secondary" href="{{ $mapOnly ? url('/dashboard') : route('incident.map') }}">{{ $mapOnly ? 'View reports' : 'View incident map' }}</a>
-        <a id="export" class="btn-secondary" href="/api/v1/reports/export">Export CSV</a>
-        <button id="print" class="btn-secondary">Print loaded reports</button>
+        @can('admin')
+            <a id="export" class="btn-secondary" href="/api/v1/reports/export">Export CSV</a>
+            <button id="print" class="btn-secondary">Print loaded reports</button>
+        @endcan
         <button id="refresh" class="btn-secondary">Refresh now</button>
     </div>
-    <p class="text-sm text-slate-600 mb-3">Times below are shown in Asia/Manila. Reports and map pins are paginated; printing includes the current page.</p>
+    <p class="text-sm text-slate-600 mb-3">Times below are shown in Asia/Manila. Reports and map pins are paginated.@can('admin') Printing includes the current page.@endcan</p>
     @if($mapOnly)
         <section class="panel" id="map-section">
             <h2 class="text-xl font-semibold">Incident map &amp; decision support</h2>

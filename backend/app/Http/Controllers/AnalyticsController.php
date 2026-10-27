@@ -7,6 +7,7 @@ use App\Services\IncidentFilters;
 use App\Services\IncidentWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 
 class AnalyticsController extends Controller
 {
@@ -47,7 +48,7 @@ class AnalyticsController extends Controller
 
     public function export(Request $r, IncidentFilters $filters)
     {
-        $this->staff($r);
+        Gate::authorize('admin');
         $q = $filters->query($r)->orderBy('id');
         abort_if((clone $q)->count() > 10000, 422, 'Narrow filters to at most 10,000 reports.');
 

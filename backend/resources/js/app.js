@@ -191,7 +191,8 @@ if (dashboard) {
                 tr.append(ref, node('td', i.description), node('td', i.agency?.name || 'Needs triage'), location, status, mapCell, actions); rows.append(tr);
             }
             lastPage = incidents.meta.last_page; document.querySelector('#page').textContent = `Page ${page} of ${lastPage}`; document.querySelector('#previous').disabled = page <= 1; document.querySelector('#next').disabled = page >= lastPage;
-            document.querySelector('#export').href = `/api/v1/reports/export?${params()}`;
+            const exportLink = document.querySelector('#export');
+            if (exportLink) exportLink.href = `/api/v1/reports/export?${params()}`;
             const switchView = document.querySelector('#switch-view');
             if (switchView) switchView.href = `${new URL(switchView.href).pathname}?${params()}`;
             message.textContent = `Updated ${date(new Date())}. Refreshes every 15 seconds while visible.`;
@@ -199,7 +200,9 @@ if (dashboard) {
         } catch (e) { message.textContent = `Could not refresh: ${e.message}. Existing information may be stale.`; } finally { busy = false; }
     }
     filters.addEventListener('submit', e => { e.preventDefault(); page = 1; load(); });
-    document.querySelector('#refresh').onclick = load; document.querySelector('#print').onclick = () => window.print();
+    document.querySelector('#refresh').onclick = load;
+    const printButton = document.querySelector('#print');
+    if (printButton) printButton.onclick = () => window.print();
     document.querySelector('#previous').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#next').onclick = () => { if (page < lastPage) { page++; load(); } };
     for (const id of ['exploratory', 'show-pins']) document.querySelector(`#${id}`)?.addEventListener('change', () => updateMap().catch(e => { document.querySelector('#map-status').textContent = e.message; }));
     setInterval(() => { if (!document.hidden) load(); }, 15000); document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); }); load();

@@ -55,11 +55,12 @@ const assert = require('node:assert/strict');
             if (url.pathname.endsWith('/notifications')) return route.fulfill({ json: { data: [], meta: { total: 0 } } });
             if (url.pathname.endsWith('/heatmap')) return route.fulfill({ json: { data: { points: [], exploratory: false } } });
             const mapView = url.pathname === '/incident-map';
+            const role = url.searchParams.get('role') === 'officer' ? 'officer' : 'admin';
             return route.fulfill({ contentType: 'text/html', body: `<meta name="csrf-token" content="synthetic">
-                <div id="dashboard" ${mapView ? 'data-map-key="synthetic"' : ''} data-role="admin">
+                <div id="dashboard" ${mapView ? 'data-map-key="synthetic"' : ''} data-role="${role}">
                 <form id="filters"><input name="q"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><select name="agency_id"><option value="">All authorized</option><option value="1">Fire Department (BFP)</option><option value="2">Police Department (PNP)</option><option value="3">MDRRMO</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
                 <span id="page"></span><button id="previous"></button><button id="next"></button>
-                <a id="switch-view" href="${mapView ? '/dashboard' : '/incident-map'}"></a><a id="export"></a><button id="print"></button><button id="refresh"></button>
+                <a id="switch-view" href="${mapView ? '/dashboard' : '/incident-map'}"></a>${role === 'admin' ? '<a id="export"></a><button id="print"></button>' : ''}<button id="refresh"></button>
                 ${mapView ? `
                 <input type="checkbox" id="show-pins" checked><input type="checkbox" id="exploratory">
                 <p id="map-status"></p><div id="map"></div>` : '<table><tbody id="incidents"></tbody></table>'}
@@ -152,6 +153,13 @@ const assert = require('node:assert/strict');
         await page.locator('#refresh').click();
         await page.waitForFunction(() => window.__markers.filter(m => m.options.map).length === 1 && window.__markers.length === 2);
         assert.equal(await page.evaluate(() => window.__map.zoom), 12, 'Polling must preserve the user map position.');
+        await page.goto('http://cdrmapp.test/dashboard?role=officer');
+        await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
+        await page.locator('#incidents tr').first().waitFor();
+        assert.equal(await page.locator('#export, #print').count(), 0);
+        assert.equal(await page.getByRole('link', { name: 'View report synthetic-6 on map', exact: true }).count(), 1);
+        await page.getByRole('button', { name: 'Mark as done', exact: true }).first().click();
+        await page.waitForFunction(() => document.querySelector('#incidents tr td:nth-child(5)').textContent === 'Done');
         assert.deepEqual(errors, []);
         console.log('PASS: watchlist eye link opens the selected report at its coordinates with the correct Done pin; polling preserves map position; agency pins, status actions, filtering and report-only Maps isolation.');
     } finally {
