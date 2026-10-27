@@ -57,9 +57,9 @@ class ReportDashboardTest extends TestCase
         Notification::fake();
         $incident = $this->report('submitted');
         Sanctum::actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => Agency::where('type', 'PNP')->value('id')]));
-        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done'])->assertForbidden();
+        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertForbidden();
         Sanctum::actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => $incident->agency_id]));
-        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done'])->assertOk()->assertJsonPath('data.workflow_status', 'done');
+        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertOk()->assertJsonPath('data.workflow_status', 'done');
         $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'need_action'])->assertOk()->assertJsonPath('data.workflow_status', 'need_action');
         $this->assertDatabaseCount('incident_status_histories', 2);
         $this->assertDatabaseCount('audit_logs', 2);
@@ -75,7 +75,7 @@ class ReportDashboardTest extends TestCase
         $reporter = $incident->reporter;
         $otherCitizen = User::factory()->create();
         Sanctum::actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => $incident->agency_id]));
-        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done'])->assertOk();
+        $this->patchJson('/api/v1/incidents/'.$incident->id.'/status', ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertOk();
         Notification::assertSentTo($reporter, IncidentChanged::class, fn ($n, $channels) => $n->status === 'done'
             && $n->incidentId === $incident->id
             && in_array(FcmChannel::class, $channels, true));

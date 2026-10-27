@@ -48,5 +48,19 @@
     @endif
     <div class="flex gap-4 mt-4"><button id="previous" class="btn-secondary">Previous</button><span id="page" class="self-center"></span><button id="next" class="btn-secondary">Next</button></div>
     <dialog id="incident-detail" class="panel max-w-2xl w-full"><form method="dialog"><button class="btn-secondary float-right">Close</button></form><div id="detail-body"></div></dialog>
+    <dialog id="complete-report" class="panel max-w-xl w-full" aria-labelledby="complete-title">
+        <form id="complete-report-form" class="grid gap-4">
+            <h2 id="complete-title" class="text-xl font-bold">Mark report as done</h2>
+            <p id="complete-reference" class="text-sm break-all"></p>
+            <label for="completion-note">Response notes</label>
+            <textarea id="completion-note" name="note" required maxlength="2000" aria-describedby="completion-help"></textarea>
+            <p id="completion-help" class="text-sm">Describe the action taken. These notes will be saved in the report's response log.</p>
+            <p id="completion-status" role="alert"></p>
+            <div class="flex gap-3">
+                <button id="complete-submit" type="submit" class="btn">Save notes and mark as done</button>
+                <button id="complete-cancel" type="button" class="btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </dialog>
 </div>
 @endsection

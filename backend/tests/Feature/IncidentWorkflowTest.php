@@ -69,10 +69,10 @@ class IncidentWorkflowTest extends TestCase
     {
         Sanctum::actingAs($this->user());
         $id = $this->postJson('/api/v1/incidents', $this->payload())->json('data.id');
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done'])->assertForbidden();
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertForbidden();
         Sanctum::actingAs($this->user('officer', $this->category()->agency_id));
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done'])->assertOk()->assertJsonPath('data.workflow_status', 'done')->assertJsonPath('data.verification_status', 'unverified');
-        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done'])->assertOk();
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertOk()->assertJsonPath('data.workflow_status', 'done')->assertJsonPath('data.verification_status', 'unverified');
+        $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertOk();
         $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'need_action'])->assertOk()->assertJsonPath('data.workflow_status', 'need_action');
         $this->patchJson("/api/v1/incidents/$id/status", ['status' => 'verified'])->assertUnprocessable();
         $this->postJson("/api/v1/incidents/$id/verify", ['rationale' => 'Confirmed test event'])->assertOk()->assertJsonPath('data.verification_status', 'validated')->assertJsonPath('data.workflow_status', 'need_action');

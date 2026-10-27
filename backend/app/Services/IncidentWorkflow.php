@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\Incident;
+use App\Models\IncidentResponse;
 use App\Models\IncidentStatusHistory;
 use App\Models\User;
 use App\Notifications\IncidentChanged;
@@ -24,11 +25,18 @@ class IncidentWorkflow
         if (! in_array($next, self::TRANSITIONS[$i->workflow_status] ?? [], true)) {
             throw ValidationException::withMessages(['status' => 'This status transition is not allowed.']);
         }
+        if ($next === 'done' && trim((string) $note) === '') {
+            throw ValidationException::withMessages(['note' => 'Response notes are required before marking a report as done.']);
+        }
+        $note = $note === null ? null : trim($note);
         $old = $i->workflow_status;
         $i->workflow_status = $next;
         $i->save();
+        if ($next === 'done') {
+            IncidentResponse::create(['incident_id' => $i->id, 'officer_id' => $actor->id, 'note' => $note, 'outcome' => 'Done', 'occurred_at' => now()]);
+        }
         IncidentStatusHistory::create(['incident_id' => $i->id, 'actor_id' => $actor->id, 'old_status' => $old, 'new_status' => $next, 'note' => $note]);
-        AuditLog::recordChange($actor, 'incident.status', $i, ['status' => $old], ['status' => $next], $i->public_reference);
+        AuditLog::recordChange($actor, 'incident.status', $i, ['status' => $old], ['status' => $next, 'note' => $note], $i->public_reference);
         $this->notify($i);
     }
 

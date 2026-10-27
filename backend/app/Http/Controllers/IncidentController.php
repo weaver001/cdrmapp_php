@@ -41,7 +41,7 @@ class IncidentController extends Controller
     {
         Gate::authorize('view', $incident);
 
-        return new IncidentResource($incident->load(['agency', 'category', 'histories', 'responses', 'reporter', 'attachments']));
+        return new IncidentResource($incident->load(['agency', 'category', 'histories', 'responses.officer:id,name', 'reporter', 'attachments']));
     }
 
     public function store(Request $r, IncidentWorkflow $flow)
@@ -91,7 +91,7 @@ class IncidentController extends Controller
     public function status(Request $r, Incident $incident, IncidentWorkflow $flow)
     {
         Gate::authorize('update', $incident);
-        $d = $r->validate(['status' => ['required', Rule::in(array_keys(IncidentWorkflow::STATUSES))], 'note' => 'nullable|string|max:2000']);
+        $d = $r->validate(['status' => ['required', Rule::in(array_keys(IncidentWorkflow::STATUSES))], 'note' => 'required_if:status,done|nullable|string|max:2000']);
         DB::transaction(function () use ($incident, $r, $flow, $d) {
             $i = Incident::lockForUpdate()->findOrFail($incident->id);
             Gate::authorize('update', $i);

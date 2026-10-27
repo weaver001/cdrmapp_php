@@ -110,46 +110,59 @@ if (dashboard) {
         overlay.setProps({ layers: [new HeatmapLayerClass({ id: 'validated-incident-density', data: result.data.points, getPosition: p => [p.longitude, p.latitude], getWeight: p => p.weight, radiusPixels: 45, intensity: 1 })] });
         document.querySelector('#map-status').textContent = `${selected ? `Viewing report ${selected.public_reference}. ` : ''}${result.data.points.length} eligible density cells. ${result.data.exploratory ? 'Exploratory view includes unverified and uncertain locations.' : 'Validated incidents only.'}`;
     }
-    async function action(id, operation) {
-        try {
-            await api(`/api/v1/incidents/${id}/status`, 'PATCH', { status: operation });
-            await load();
-            if (document.querySelector('#incident-detail')?.open) await detail(id);
-        } catch (e) { message.textContent = e.message; }
+    const completionDialog = document.querySelector('#complete-report');
+    const completionForm = document.querySelector('#complete-report-form');
+    const completionNote = document.querySelector('#completion-note');
+    let completionId = null, completing = false;
+    async function changeStatus(id, operation, note) {
+        await api(`/api/v1/incidents/${id}/status`, 'PATCH', { status: operation, ...(note === undefined ? {} : { note }) });
+        await load();
+        if (document.querySelector('#incident-detail')?.open) await detail(id);
     }
+    async function action(id, operation) {
+        if (operation === 'done') {
+            completionId = id; completionForm.reset(); completionNote.setCustomValidity('');
+            document.querySelector('#completion-status').textContent = '';
+            document.querySelector('#complete-reference').textContent = latest.find(i => i.id === id)?.public_reference || `Report ${id}`;
+            completionDialog.showModal(); completionNote.focus();
+            return;
+        }
+        try { await changeStatus(id, operation); } catch (e) { message.textContent = e.message; }
+    }
+    completionForm?.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (completing) return;
+        const note = completionNote.value.trim();
+        completionNote.setCustomValidity(note ? '' : 'Enter response notes before marking the report as done.');
+        if (!completionForm.reportValidity()) return;
+        completing = true;
+        for (const id of ['complete-submit', 'complete-cancel']) document.querySelector(`#${id}`).disabled = true;
+        document.querySelector('#completion-status').textContent = 'Saving response notes…';
+        try {
+            await changeStatus(completionId, 'done', note);
+            completionDialog.close(); completionForm.reset();
+        } catch (error) { document.querySelector('#completion-status').textContent = error.message; }
+        finally {
+            completing = false;
+            for (const id of ['complete-submit', 'complete-cancel']) document.querySelector(`#${id}`).disabled = false;
+        }
+    });
+    completionNote?.addEventListener('input', () => completionNote.setCustomValidity(''));
+    document.querySelector('#complete-cancel')?.addEventListener('click', () => completionDialog.close());
+    completionDialog?.addEventListener('cancel', event => { if (completing) event.preventDefault(); });
     async function detail(id) {
         try {
             const { data: i } = await api(`/api/v1/incidents/${id}`); const body = document.querySelector('#detail-body'); body.replaceChildren(node('h2', i.public_reference, 'text-xl font-bold'), node('p', i.description, 'my-4 whitespace-pre-line'), node('p', `${i.latitude}, ${i.longitude} · ${i.location_source} · accuracy: ${i.accuracy_m ?? 'not measured'} m`), node('p', `Reporter: ${i.reporter?.name || 'restricted'} · ${i.address || 'No address supplied'}`), node('h3', 'Status history', 'font-bold mt-5'));
             body.append(node('p', `Status: ${reportStatusLabel(i.workflow_status)}`, 'font-semibold my-3'), button(i.workflow_status === 'done' ? 'Mark as undone' : 'Mark as done', () => action(i.id, i.workflow_status === 'done' ? 'need_action' : 'done')));
             for (const h of i.histories || []) body.append(node('p', `${date(h.created_at)} · ${statusLabel(h.new_status)} · ${h.note || ''}`, 'mt-2'));
             for (const attachment of i.attachments || []) { const a=node('a',`Download incident image ${attachment.id}`,'block underline my-2');a.href=`/api/v1/incidents/${i.id}/attachments/${attachment.id}`;body.append(a); }
-            body.append(node('h3', 'Response notes', 'font-bold mt-5'));
-            for (const h of i.responses || []) body.append(node('p', `${date(h.occurred_at)} · ${h.note} · ${h.outcome || ''}`, 'mt-2'));
-            body.append(button('Log response', async () => {
-                const note = prompt('Response note:'); if (!note) return;
-                try { await api(`/api/v1/incidents/${i.id}/responses`, 'POST', { note, occurred_at: new Date().toISOString() }); await detail(i.id); } catch (e) { message.textContent = e.message; }
-            }));
-            const assignment = node('form',null,'grid gap-3 mt-5'); const officerLabel=node('label','Assigned officer');const officer=node('select');officer.name='assigned_officer_id';officerLabel.append(officer);
-            officer.setAttribute('aria-label', 'Assigned officer');
-            const agencyLabel = node('label', 'Routed agency');
-            const agency = document.querySelector('#filters select[name=agency_id]').cloneNode(true);
-            agency.setAttribute('aria-label', 'Routed agency');
-            for (const option of [...agency.options]) if (!option.value) option.remove();
-            const placeholder = node('option', 'Select agency');
-            placeholder.value = ''; placeholder.disabled = true; placeholder.hidden = true;
-            agency.prepend(placeholder); agency.required = true;
-            agency.value = i.agency_id == null ? '' : String(i.agency_id);
-            agencyLabel.append(agency);
-            async function listOfficers() {
-                officer.replaceChildren(node('option', 'Unassigned')); officer.options[0].value = '';
-                if (!agency.value) return;
-                const result = await api('/api/v1/officers?agency_id=' + agency.value);
-                for (const user of result.data) { const option = node('option', user.name); option.value = user.id; officer.append(option); }
-                const assigned = i.assigned_officer_id == null ? '' : String(i.assigned_officer_id);
-                officer.value = [...officer.options].some(option => option.value === assigned) ? assigned : '';
+            body.append(node('h3', 'Response log', 'font-bold mt-5'));
+            if (!i.responses?.length) body.append(node('p', 'No response notes recorded.', 'mt-2 text-sm'));
+            for (const response of i.responses || []) {
+                const entry = node('section', null, 'mt-3 border-t pt-3');
+                entry.append(node('p', `${date(response.occurred_at)} · ${response.officer?.name || `Staff #${response.officer_id}`} · ${response.outcome || 'Response'}`, 'text-sm font-semibold'), node('p', response.note, 'mt-2 whitespace-pre-wrap'));
+                body.append(entry);
             }
-            if(dashboard.dataset.role==='admin'){assignment.append(agencyLabel);agency.onchange=listOfficers;}assignment.append(officerLabel);await listOfficers();
-            const noteLabel=node('label','Assignment / rerouting reason');const note=node('textarea');note.required=true;note.maxLength=2000;noteLabel.append(note);assignment.append(noteLabel);const save=node('button','Save assignment','btn');save.type='submit';assignment.append(save);assignment.onsubmit=async event=>{event.preventDefault();try{await api(`/api/v1/incidents/${i.id}/assign`,'POST',{assigned_officer_id:officer.value?Number(officer.value):null,...(dashboard.dataset.role==='admin'?{agency_id:agency.value?Number(agency.value):null}:{}),note:note.value});await detail(i.id);await load();}catch(error){message.textContent=error.message;}};body.append(assignment);
             const notices=await api('/api/v1/notifications');await Promise.all(notices.data.filter(n=>n.data.incident_id===i.id).map(n=>api(`/api/v1/notifications/${n.id}/read`,'POST',{})));
             const dialog = document.querySelector('#incident-detail'); if (!dialog.open) dialog.showModal();
         } catch (e) { message.textContent = e.message; }

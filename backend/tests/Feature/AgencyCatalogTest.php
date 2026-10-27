@@ -103,7 +103,7 @@ class AgencyCatalogTest extends TestCase
             $this->get('/dashboard')->assertOk()->assertDontSee('id="export"', false)->assertDontSee('id="print"', false)->assertSee('Response watchlist');
             $this->get('/incident-map')->assertOk()->assertDontSee('id="export"', false)->assertDontSee('id="print"', false);
             $own = $this->getJson('/api/v1/incidents')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.agency_id', $agency->id)->json('data.0');
-            $this->patchJson('/api/v1/incidents/'.$own['id'].'/status', ['status' => 'done'])->assertOk()->assertJsonPath('data.workflow_status', 'done');
+            $this->patchJson('/api/v1/incidents/'.$own['id'].'/status', ['status' => 'done', 'note' => 'SYNTHETIC response: assistance completed.'])->assertOk()->assertJsonPath('data.workflow_status', 'done');
         }
     }
 }
