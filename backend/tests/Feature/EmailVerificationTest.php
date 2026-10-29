@@ -47,7 +47,7 @@ class EmailVerificationTest extends TestCase
     public function test_browser_resend_returns_to_verification_page_with_confirmation(): void
     {
         Notification::fake();
-        $user = User::factory()->unverified()->create(['role' => 'officer']);
+        $user = User::factory()->unverified()->create(['role' => 'citizen']);
         $this->actingAs($user)->post('/email/verification-notification')->assertRedirect(route('verification.notice'))
             ->assertSessionHas('status', 'Verification link sent. Please check your inbox.');
         Notification::assertSentTo($user, VerifyEmail::class);

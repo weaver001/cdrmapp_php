@@ -70,8 +70,15 @@ class AuthController extends Controller
     {
         $d = $r->validate(['current_password' => 'required|current_password:sanctum', 'password' => ['required', 'confirmed', PasswordRule::min(12)->letters()->numbers()]]);
         DB::transaction(function () use ($r, $d) {
-            $r->user()->forceFill(['password' => $d['password'], 'remember_token' => Str::random(60)])->save();
-            $this->revokePasswordSessions($r->user());
+            $user = User::lockForUpdate()->findOrFail($r->user()->id);
+            if (! Hash::check($d['current_password'], $user->password)) {
+                throw ValidationException::withMessages(['current_password' => 'The current password is incorrect.']);
+            }
+            if ($user->must_change_password && Hash::check($d['password'], $user->password)) {
+                throw ValidationException::withMessages(['password' => 'Choose a new password different from your temporary password.']);
+            }
+            $user->forceFill(['password' => $d['password'], 'remember_token' => Str::random(60), 'must_change_password' => false])->save();
+            $this->revokePasswordSessions($user);
         });
         $this->signOutBrowser($r);
 
@@ -87,13 +94,23 @@ class AuthController extends Controller
         $d = $r->validate(['current_password' => 'required|current_password:sanctum', 'email' => 'required|email|max:254|unique:users']);
         $r->user()->forceFill(['email' => $d['email'], 'email_verified_at' => null])->save();
         $r->user()->tokens()->delete();
-        $r->user()->sendEmailVerificationNotification();
+        if (! $r->user()->hasVerifiedEmail()) {
+            $r->user()->sendEmailVerificationNotification();
+        }
 
-        return ['data' => ['message' => 'Check your new email and sign in again.']];
+        return ['data' => ['message' => $r->user()->isStaff() ? 'Email updated. Sign in again.' : 'Check your new email and sign in again.']];
     }
 
     public function resend(Request $r)
     {
+        if ($r->user()->isStaff()) {
+            $message = 'Email verification is not required for staff accounts.';
+            if (! $r->is('api/*') && ! $r->expectsJson()) {
+                return redirect($r->user()->must_change_password ? route('password.required') : '/dashboard')->with('status', $message);
+            }
+
+            return ['data' => ['message' => $message]];
+        }
         if (! $r->user()->hasVerifiedEmail()) {
             $r->user()->sendEmailVerificationNotification();
         }
@@ -135,8 +152,11 @@ class AuthController extends Controller
     {
         $r->validate(['token' => 'required', 'email' => 'required|email', 'password' => ['required', 'confirmed', PasswordRule::min(12)->letters()->numbers()]]);
         $status = Password::reset($r->only('email', 'password', 'password_confirmation', 'token'), function (User $u, string $password) {
+            if ($u->must_change_password && Hash::check($password, $u->password)) {
+                throw ValidationException::withMessages(['password' => 'Choose a new password different from your temporary password.']);
+            }
             DB::transaction(function () use ($u, $password) {
-                $u->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
+                $u->forceFill(['password' => $password, 'remember_token' => Str::random(60), 'must_change_password' => false])->save();
                 $this->revokePasswordSessions($u);
             });
             event(new PasswordReset($u));

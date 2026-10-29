@@ -6,8 +6,11 @@
     <nav aria-label="Main" class="site-nav">
         @foreach(\App\Models\PublicPage::LABELS as $key => $label)<a href="/pages/{{ $key }}">{{ $label }}</a>@endforeach
         @auth
-            @if(auth()->user()->isStaff())<a href="/dashboard">Dashboard</a>@endif
-            <a href="/profile">Profile</a><form method="post" action="/logout">@csrf<button>Sign out</button></form>
+            @unless(auth()->user()->must_change_password)
+                @if(auth()->user()->isStaff())<a href="/dashboard">Dashboard</a>@endif
+                <a href="/profile">Profile</a>
+            @endunless
+            <form method="post" action="/logout">@csrf<button>Sign out</button></form>
         @else<a href="/login">Staff sign in</a>@endauth
     </nav>
 </div></header>
@@ -17,6 +20,7 @@
 @auth @if(auth()->user()->isStaff())
     <aside class="staff-sidebar print:hidden">
         <div class="staff-user"><x-profile-avatar :user="auth()->user()" class="staff-avatar" /><div><p class="font-semibold text-sm">{{ auth()->user()->name }}</p><p class="text-xs text-emerald-200">{{ ucfirst(auth()->user()->role) }}</p></div></div>
+        @if(auth()->user()->must_change_password)<p class="text-sm px-4 py-3">Password update required</p>@else
         <details class="staff-menu" data-staff-menu open><summary>CDRMAPP navigation</summary><nav aria-label="Staff">
             <a href="/dashboard" @if(request()->is('dashboard')) aria-current="page" @endif>Incident dashboard</a>
             <a href="/incident-map" @if(request()->is('incident-map')) aria-current="page" @endif>Map &amp; heatmap</a>
@@ -29,6 +33,7 @@
                 @foreach(['users' => 'Users', 'agencies' => 'Agencies', 'messages' => 'Messages', 'audit' => 'Audit history'] as $key => $label)<a href="/manage/{{ $key }}" @if(request()->is('manage/'.$key)) aria-current="page" @endif>{{ $label }}</a>@endforeach
             @endif
         </nav></details>
+        @endif
     </aside>
 @endif @endauth
 <main id="main" class="workspace-main">@yield('content')</main>

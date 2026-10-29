@@ -31,7 +31,7 @@ class CitizenViewModel(application: Application) : AndroidViewModel(application)
  private suspend fun refreshInternal() {
   val user = repo.api.me().data
   mutable.value = mutable.value.copy(user = user, pending = repo.pending())
-  if (user.verifiedAt != null) {
+  if (!user.requiresEmailVerification && !user.mustChangePassword) {
    org.cdrmapp.citizen.push.PushRegistration.register(getApplication())
    val categories = repo.api.categories().data; val list = repo.api.incidents(mutable.value.page)
    mutable.value = mutable.value.copy(categories = categories, incidents = list.data, lastPage = list.meta.lastPage)
@@ -56,7 +56,7 @@ class CitizenViewModel(application: Application) : AndroidViewModel(application)
  fun detail(id: Long) = run { mutable.value = mutable.value.copy(detail = repo.api.incident(id).data) }
  fun closeDetail() { mutable.value = mutable.value.copy(detail = null) }
  fun profile(name: String, dob: String) = run { mutable.value = mutable.value.copy(user = repo.api.profile(mapOf("name" to name, "date_of_birth" to dob)).data, message = "Profile updated.") }
- fun email(email: String, password: String) = run { repo.api.email(mapOf("email" to email, "current_password" to password)); repo.clearSession(); mutable.value = CitizenState(message = "Verify your new email and sign in again.") }
+ fun email(email: String, password: String) = run { val response = repo.api.email(mapOf("email" to email, "current_password" to password)); repo.clearSession(); mutable.value = CitizenState(message = response.data["message"] ?: "Email updated. Sign in again.") }
  fun password(current: String, password: String, confirm: String) = run { repo.api.password(mapOf("current_password" to current, "password" to password, "password_confirmation" to confirm)); repo.clearSession(); mutable.value = CitizenState(message = "Password changed. Sign in again.") }
  fun logout() = run { try { repo.logout() } finally { mutable.value = CitizenState(message = "Signed out. Any unconfirmed report remains saved for this account.") } }
 }

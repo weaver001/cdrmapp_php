@@ -124,4 +124,20 @@ class RepositoryTest {
    assertEquals(submission, repo.pending())
   } finally { server.shutdown() }
  }
+ @Test fun staffVerificationExemptionAndTemporaryPasswordFlagAreReadFromTheApi() = runBlocking {
+  val server = MockWebServer(); server.start()
+  try {
+   val repo = Repository(MemoryStore(), server.url("/api/v1/").toString())
+   for (role in listOf("admin", "officer", "citizen")) {
+    server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":{"id":42,"name":"Synthetic","email":"$role@cdrmapp.com","role":"$role","email_verified_at":null,"must_change_password":true}}"""))
+    val user = repo.api.me().data
+    assertEquals(role == "citizen", user.requiresEmailVerification)
+    assertTrue(user.mustChangePassword)
+   }
+   server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"data":{"id":42,"name":"Synthetic","email":"citizen@cdrmapp.com","email_verified_at":null}}"""))
+   val legacy = repo.api.me().data
+   assertFalse(legacy.mustChangePassword)
+   assertTrue(legacy.requiresEmailVerification)
+  } finally { server.shutdown() }
+ }
 }

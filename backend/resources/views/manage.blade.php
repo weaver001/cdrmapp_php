@@ -18,9 +18,16 @@
         </form>
     </details>
 @endif
-<div id="management" data-module="{{ $module }}">
+<div id="management" data-module="{{ $module }}" data-current-user-id="{{ auth()->id() }}">
     <h{{ $page ? '2' : '1' }} class="{{ $page ? 'section-heading' : 'text-3xl font-bold mb-4' }}">{{ $page ? 'Content items' : 'Manage '.ucwords(str_replace('-',' ',$module)) }}</h{{ $page ? '2' : '1' }}>
     <p id="form-status" class="my-4" role="status"></p>
+    @if($module==='users')
+        <form id="user-filters" class="panel grid sm:grid-cols-3 gap-4 mb-5">
+            <label>Account type<select name="account_type"><option value="all">All accounts</option><option value="officer">All officers</option><option value="admin">Administrator</option><option value="citizen">Citizen</option><option value="fire">Fire Department (BFP)</option><option value="crime">Crime / Police Department (PNP)</option><option value="mdrrmo">MDRRMO</option></select></label>
+            <label>Account status<select name="activity"><option value="all">Active and inactive</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+            <button class="btn self-end">Apply filters</button>
+        </form>
+    @endif
     @if(in_array($module,\App\Http\Controllers\ContentController::TYPES))
         <form id="editor" class="panel grid gap-4 mb-6" data-endpoint="/api/v1/management/content/{{ $module }}"><input type="hidden" name="id">
             <label>Image (JPEG, PNG or WebP, up to 5 MB)<input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
@@ -38,7 +45,12 @@
             <label>Role<select name="role" required><option value="">Select role</option><option value="officer">Officer</option><option value="admin">Administrator</option><option value="citizen">Citizen</option></select></label>
             <label>Agency<select name="agency_id"><option value="">None</option>@foreach($agencies as $a)<option value="{{ $a->id }}">{{ $a->name }}</option>@endforeach</select></label>
             <label class="flex gap-2 items-center"><input type="checkbox" name="active" checked class="w-auto"> Active account</label>
-            <p class="text-sm text-slate-600">New users receive a password reset invitation. No password is displayed.</p>
+            <div data-staff-passwords hidden class="sm:col-span-2 grid gap-4">
+                <label>Temporary password<input type="password" name="initial_password" minlength="12" autocomplete="new-password" disabled></label>
+                <label>Confirm temporary password<input type="password" name="initial_password_confirmation" minlength="12" autocomplete="new-password" disabled></label>
+                <p class="text-sm text-slate-600">Use at least 12 characters with letters and numbers. Share this password securely. Staff must replace it on first sign-in. Leave blank when editing to keep the existing password.</p>
+            </div>
+            <p data-account-delivery class="text-sm text-slate-600 sm:col-span-2">Citizens receive a password invitation and must verify their email. Staff accounts do not require email verification.</p>
             <button class="btn">Save account</button><button type="reset" class="btn-secondary">Clear Field</button>
         </form>
     @elseif($module==='messages')
@@ -46,5 +58,16 @@
     @endif
     <section id="records" class="grid gap-4"></section>
     <div class="flex gap-4 mt-5"><button id="manage-prev" class="btn-secondary">Previous</button><span id="manage-page"></span><button id="manage-next" class="btn-secondary">Next</button></div>
+    @if($module==='users')
+        <dialog id="staff-reset-confirm" class="panel max-w-lg w-full" aria-labelledby="staff-reset-title">
+            <form id="staff-reset-form" class="grid gap-4">
+                <h2 id="staff-reset-title" class="text-xl font-bold">Confirm password reset</h2>
+                <p id="staff-reset-account" class="break-all"></p>
+                <p>This sends a reset email and requires the user to update their password before accessing the system. For a staff account without an inbox, use Edit to set a temporary password instead.</p>
+                <p id="staff-reset-status" role="alert"></p>
+                <div class="flex gap-3"><button id="staff-reset-submit" type="submit" class="btn">Confirm</button><button id="staff-reset-exit" type="button" class="btn-secondary">Exit</button></div>
+            </form>
+        </dialog>
+    @endif
 </div>
 @endsection

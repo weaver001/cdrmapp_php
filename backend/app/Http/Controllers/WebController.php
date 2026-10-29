@@ -7,6 +7,7 @@ use App\Models\ContactMessage;
 use App\Models\Content;
 use App\Models\IncidentCategory;
 use App\Models\PublicPage;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -49,6 +50,10 @@ class WebController extends Controller
         }
         $r->session()->regenerate();
 
+        if ($r->user()->must_change_password) {
+            return redirect()->route('password.required');
+        }
+
         return redirect()->intended('/dashboard');
     }
 
@@ -87,9 +92,11 @@ class WebController extends Controller
     public function forgot(Request $r)
     {
         $r->validate(['email' => 'required|email']);
-        Password::sendResetLink($r->only('email'));
+        if (User::where('email', $r->input('email'))->whereIn('role', ['admin', 'officer'])->exists()) {
+            Password::sendResetLink($r->only('email'));
+        }
 
-        return back()->with('status', 'If the account exists, a reset link has been sent.');
+        return back()->with('status', 'If a staff account exists, a reset link has been sent. Citizens should request password resets in the Android app.');
     }
 
     public function reset(Request $r)

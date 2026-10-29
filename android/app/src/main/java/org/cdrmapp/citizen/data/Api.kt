@@ -6,7 +6,9 @@ import retrofit2.http.*
 data class Envelope<T>(val data: T)
 data class Page<T>(val data: List<T>, val meta: PageMeta)
 data class PageMeta(@SerializedName("current_page") val currentPage: Int, @SerializedName("last_page") val lastPage: Int)
-data class Citizen(val id: Long, val name: String, val email: String, @SerializedName("email_verified_at") val verifiedAt: String?, @SerializedName("date_of_birth") val dateOfBirth: String?)
+data class Citizen(val id: Long, val name: String, val email: String, @SerializedName("email_verified_at") val verifiedAt: String?, @SerializedName("date_of_birth") val dateOfBirth: String?, val role: String? = null, @SerializedName("must_change_password") val mustChangePassword: Boolean = false) {
+ val requiresEmailVerification: Boolean get() = role !in listOf("admin", "officer") && verifiedAt == null
+}
 data class Login(val user: Citizen, val token: String)
 data class Category(val id: Long, val name: String, @SerializedName("agency_id") val agencyId: Long?)
 data class History(@SerializedName("new_status") val status: String, val note: String?, @SerializedName("created_at") val at: String)

@@ -70,6 +70,19 @@ class MainActivity : ComponentActivity() {
   }
  } }
  @Composable private fun CitizenScreen(vm: CitizenViewModel, state: CitizenState) {
+  if (state.user?.mustChangePassword == true) {
+   var current by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirm by remember { mutableStateOf("") }
+   Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Text("Change your temporary password", style = MaterialTheme.typography.headlineSmall)
+    Text("Choose your own password before continuing. Use at least 12 characters with letters and numbers.")
+    PasswordField("Temporary password", current) { current = it }
+    PasswordField("New password", password) { password = it }
+    PasswordField("Confirm new password", confirm) { confirm = it }
+    Button(onClick = { vm.password(current, password, confirm) }, enabled = !state.busy && current.isNotBlank() && password.length >= 12 && password == confirm) { Text("Update password and sign out") }
+    TextButton(onClick = vm::logout, enabled = !state.busy) { Text("Sign out") }
+   }
+   return
+  }
   var tab by remember { mutableStateOf("Report") }
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
    for (name in listOf("Report", "History", "Profile")) {
@@ -78,7 +91,7 @@ class MainActivity : ComponentActivity() {
    }
    TextButton(onClick = vm::logout, enabled = !state.busy, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) { Text("Sign out") }
   }
-  if (state.user?.verifiedAt == null) {
+  if (state.user?.requiresEmailVerification == true) {
    Text("Verify your email before sending incident reports. Use official emergency channels if you need urgent help.")
    Button(onClick = vm::resend, enabled = !state.busy) { Text("Resend verification email") }
    OutlinedButton(onClick = vm::refresh, enabled = !state.busy) { Text("I verified my email — check again") }

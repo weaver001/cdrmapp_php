@@ -246,9 +246,65 @@ const management = document.querySelector('#management');
 if (management) {
     const module = management.dataset.module; const editor = document.querySelector('#editor'); const message = document.querySelector('#form-status');
     const content = !['users', 'messages', 'agencies', 'audit'].includes(module); let page = 1, last = 1;
+    function staffPasswordFields() {
+        if (module !== 'users' || !editor?.querySelector('[data-staff-passwords]')) return;
+        const staff = ['admin', 'officer'].includes(editor.elements.role.value);
+        const self = editor.elements.id.value && editor.elements.id.value === management.dataset.currentUserId;
+        const enabled = staff && !self;
+        editor.querySelector('[data-staff-passwords]').hidden = !enabled;
+        for (const name of ['initial_password', 'initial_password_confirmation']) {
+            const field = editor.elements.namedItem(name);
+            field.disabled = !enabled;
+            if (!enabled) field.value = '';
+            field.required = enabled && (!editor.elements.id.value || (name === 'initial_password_confirmation' && !!editor.elements.initial_password.value));
+        }
+        const help = editor.querySelector('[data-account-delivery]');
+        if (help) help.textContent = self ? 'Change your own password from Profile.' : staff ? 'Staff accounts do not require email verification or a password invitation email.' : 'Citizens receive a password invitation and must verify their email.';
+    }
+    if (module === 'users') {
+        editor?.elements.namedItem('role')?.addEventListener('change', staffPasswordFields);
+        editor?.elements.namedItem('initial_password')?.addEventListener('input', staffPasswordFields);
+        staffPasswordFields();
+    }
     const endpoint = content ? `/api/v1/management/content/${module}` : module === 'agencies' ? '/api/v1/agencies' : `/api/v1/management/${module}`;
+    const userFilters = module === 'users' ? document.querySelector('#user-filters') : null;
+    if (userFilters) {
+        const initial = new URLSearchParams(window.location.search);
+        for (const field of userFilters.elements) if (field.name && initial.has(field.name)) field.value = initial.get(field.name);
+        userFilters.addEventListener('submit', event => {
+            event.preventDefault(); page = 1;
+            window.history.replaceState(null, '', `${window.location.pathname}?${new URLSearchParams(new FormData(userFilters))}`);
+            load();
+        });
+    }
+    const resetDialog = document.querySelector('#staff-reset-confirm');
+    let resetting = false, resetTarget = null;
+    function confirmStaffReset(item) {
+        resetTarget = item.id;
+        document.querySelector('#staff-reset-account').textContent = `${item.name} · ${item.email}`;
+        document.querySelector('#staff-reset-status').textContent = '';
+        resetDialog.showModal();
+    }
+    document.querySelector('#staff-reset-exit')?.addEventListener('click', () => resetDialog.close());
+    resetDialog?.addEventListener('cancel', event => { if (resetting) event.preventDefault(); });
+    document.querySelector('#staff-reset-form')?.addEventListener('submit', async event => {
+        event.preventDefault(); if (resetting) return;
+        resetting = true;
+        for (const id of ['staff-reset-submit', 'staff-reset-exit']) document.querySelector(`#${id}`).disabled = true;
+        const status = document.querySelector('#staff-reset-status'); status.textContent = 'Requesting password reset…';
+        try {
+            const result = await api(`${endpoint}/${resetTarget}/reset-password`, 'POST', {confirm:true});
+            resetDialog.close(); message.textContent = result.data.message; window.alert('Success');
+            if (result.data.redirect) window.location.assign(result.data.redirect); else await load();
+        } catch (error) { status.textContent = error.message; }
+        finally {
+            resetting = false;
+            for (const id of ['staff-reset-submit', 'staff-reset-exit']) document.querySelector(`#${id}`).disabled = false;
+        }
+    });
     const auditActions = {
         'user.created': 'Added account', 'user.updated': 'Updated account', 'user.saved': 'Saved account',
+        'user.password_reset_requested': 'Requested staff password reset',
         'content.created': 'Added content', 'content.updated': 'Updated content', 'content.saved': 'Saved content',
         'content.deleted': 'Removed content', 'content.image_updated': 'Updated content image',
         'page.updated': 'Updated public page',
@@ -265,9 +321,17 @@ if (management) {
             await load();
         } catch (e) { message.textContent = e.message; }
     }
+    let loadSequence = 0;
     async function load() {
+        const sequence = ++loadSequence;
         try {
-            const result = await api(`${endpoint}?page=${page}&trash=${document.querySelector('#trash')?.checked ? 1 : 0}`); const list = document.querySelector('#records'); list.replaceChildren();
+            const query = new URLSearchParams({page:String(page),trash:document.querySelector('#trash')?.checked ? '1' : '0'});
+            if (userFilters) for (const [key, value] of new FormData(userFilters)) if (value) query.set(key, value);
+            const result = await api(`${endpoint}?${query}`);
+            if (sequence !== loadSequence) return;
+            last = result.meta?.last_page || result.last_page || 1;
+            if (page > last) { page = last; return load(); }
+            const list = document.querySelector('#records'); list.replaceChildren();
             for (const item of result.data) {
                 const card = node('article', null, 'panel'); card.append(node('h2', module === 'audit' ? (auditActions[item.action] || statusLabel(item.action)) : item.title || item.name || item.action, 'font-semibold text-lg'));
                 if (module === 'audit') {
@@ -295,6 +359,8 @@ if (management) {
                     if (item.deleted_at) card.append(button('Permanently delete', () => { if (confirm('Permanently delete this contact message?')) mutate(`${endpoint}/${item.id}/destroy`, 'POST', { confirm: true }); }));
                 } else {
                     card.append(node('p', content ? item.body : `${item.email} · ${item.role} · ${item.active ? 'Active' : 'Inactive'}`, 'my-3 whitespace-pre-line'));
+                    if (module === 'users' && item.role === 'officer') card.append(node('p', item.agency?.name || 'No agency assigned', 'text-sm'));
+                    if (module === 'users' && item.must_change_password) card.append(node('p', 'Password update required', 'text-sm font-semibold'));
                     if (content) {
                         card.append(node('p', item.published ? 'Published' : 'Draft', 'text-sm mb-3'));
                         if (item.image_url) {
@@ -305,15 +371,15 @@ if (management) {
                             card.append(image, imageStatus);
                         } else card.append(node('p', 'No image attached.', 'text-sm mb-3'));
                     }
-                    card.append(button('Edit', () => { for (const field of editor.elements) { if (!field.name || field.type === 'file') continue; if (field.type === 'checkbox') field.checked = !!item[field.name]; else field.value = field.name.startsWith('details.') ? (item.details?.[field.name.slice(8)] ?? '') : (item[field.name] ?? ''); } editor.scrollIntoView({ behavior: 'smooth' }); }));
+                    card.append(button('Edit', () => { for (const field of editor.elements) { if (!field.name || field.type === 'file') continue; if (field.type === 'password') field.value = ''; else if (field.type === 'checkbox') field.checked = !!item[field.name]; else field.value = field.name.startsWith('details.') ? (item.details?.[field.name.slice(8)] ?? '') : (item[field.name] ?? ''); } staffPasswordFields(); editor.scrollIntoView({ behavior: 'smooth' }); }));
                     if (content) card.append(button('Remove', () => { if (confirm('Remove this item from publication?')) mutate(`${endpoint}/${item.id}`, 'DELETE'); }));
-                    else if(module==='users') card.append(button('Send password reset', () => mutate(`${endpoint}/${item.id}/reset-password`, 'POST', {}, true)));
+                    else if(module==='users' && ['admin', 'officer'].includes(item.role)) card.append(button('Send password reset', () => confirmStaffReset(item)));
                 }
                 list.append(card);
             }
-            if (!result.data.length) list.append(node('p', 'No records yet.', 'panel'));
+            if (!result.data.length) list.append(node('p', module === 'users' ? 'No accounts match these filters.' : 'No records yet.', 'panel'));
             last = result.meta?.last_page || result.last_page || 1; document.querySelector('#manage-page').textContent = `Page ${page} of ${last}`; document.querySelector('#manage-prev').disabled = page <= 1; document.querySelector('#manage-next').disabled = page >= last;
-        } catch (e) { message.textContent = e.message; }
+        } catch (e) { if (sequence === loadSequence) message.textContent = e.message; }
     }
     let saving = false;
     editor?.addEventListener('invalid', () => { message.textContent = 'Complete the highlighted fields before saving.'; }, true);
@@ -349,9 +415,10 @@ if (management) {
         } finally {
             saving = false;
             fields.forEach(([field, disabled]) => { field.disabled = disabled; });
+            staffPasswordFields();
         }
     });
-    editor?.addEventListener('reset', () => { editor.elements.id.value = ''; message.textContent = ''; });
+    editor?.addEventListener('reset', () => { editor.elements.id.value = ''; message.textContent = ''; if (module === 'users') queueMicrotask(staffPasswordFields); });
     document.querySelector('#trash')?.addEventListener('change', () => { page = 1; load(); });
     document.querySelector('#manage-prev').onclick = () => { if (page > 1) { page--; load(); } }; document.querySelector('#manage-next').onclick = () => { if (page < last) { page++; load(); } }; load();
 }

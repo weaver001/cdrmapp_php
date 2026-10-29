@@ -20,14 +20,14 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('public/pages/{type}', [PublicPageController::class, 'published'])->whereIn('type', PublicPage::TYPES);
     Route::get('public/{type}', [ContentController::class, 'published'])->whereIn('type', ContentController::TYPES);
     Route::post('public/contact-messages', [ContentController::class, 'contact'])->middleware('throttle:5,1');
-    Route::middleware(['auth:sanctum', 'active'])->group(function () {
-        Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::middleware(['auth:sanctum', 'active', 'password.changed'])->group(function () {
+        Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.logout');
         Route::post('auth/verify-email', [AuthController::class, 'resend'])->middleware('throttle:5,1');
         Route::post('me/photo', [MediaController::class, 'photo']);
         Route::get('me/photo', [MediaController::class, 'readPhoto']);
-        Route::get('me', [AuthController::class, 'me']);
+        Route::get('me', [AuthController::class, 'me'])->name('api.me');
         Route::patch('me', [AuthController::class, 'profile']);
-        Route::post('me/change-password', [AuthController::class, 'changePassword']);
+        Route::post('me/change-password', [AuthController::class, 'changePassword'])->name('api.password.update');
         Route::post('me/change-email', [AuthController::class, 'changeEmail']);
         Route::get('agencies', [ManagementController::class, 'agencies']);
         Route::get('officers', [ManagementController::class, 'officers'])->middleware(['verified', 'can:staff']);

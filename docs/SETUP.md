@@ -10,7 +10,7 @@ No key was supplied in this task. Map rendering and billed Google API behavior a
 
 ## Mail and authentication
 
-Local SMTP is Mailpit on port 1025 in Compose; only its local UI is exposed on port 8025. Production requires verified mail transport/domain settings and a correct HTTPS APP_URL so signed verification and reset links return to the real deployment. Registration requires verification before incident access. Authentication itself remains available to unverified users so they can request another link. Do not implement the source document's inconsistent first-login exception.
+Local SMTP is Mailpit on port 1025 in Compose; only its local UI is exposed on port 8025. Production requires verified mail transport/domain settings and a correct HTTPS APP_URL so signed verification and reset links return to the real deployment. Citizens require email verification before incident access and may sign in to request another verification link. Administrator-approved admin/officer accounts are exempt by role, regardless of email domain; their actual email ownership timestamp is not forged. Admin-created temporary staff passwords must be replaced before operational web/API access. Staff creation with a temporary password sends no email. See DEPLOYMENT.md for creation, recovery and migration steps.
 
 Mobile tokens expire after one day. Web uses server sessions; mobile uses Android Keystore AES/GCM. Secure cookie, HTTPS, SameSite, CORS and proxy configuration must be reviewed for deployment. Backend API_URL and Android base URL must point to the same real database-owning Laravel service.
 
