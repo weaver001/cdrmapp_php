@@ -32,4 +32,11 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->active && in_array($this->role, ['admin', 'officer'], true);
     }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path
+            ? '/api/v1/me/photo?v='.hash('sha256', $this->profile_photo_path)
+            : null;
+    }
 }

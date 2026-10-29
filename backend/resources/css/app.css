@@ -67,6 +67,9 @@
     .staff-sidebar { background: var(--brand-green); color: white; }
     .staff-user { @apply flex items-center gap-3 px-5 py-5; border-bottom: 1px solid rgb(255 255 255 / 20%); }
     .staff-avatar { @apply flex items-center justify-center rounded-full font-bold; width: 38px; height: 38px; background: #ffedbf; color: var(--brand-green); }
+    .profile-avatar { position: relative; overflow: hidden; flex-shrink: 0; }
+    .profile-avatar-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .profile-photo-preview { @apply inline-flex items-center justify-center rounded-full font-bold text-3xl; width: 96px; height: 96px; background: #ffedbf; color: var(--brand-green); }
     .staff-menu summary { @apply px-5 py-4 text-xs font-bold uppercase tracking-wider; border-bottom: 1px solid rgb(255 255 255 / 20%); }
     .staff-menu nav { @apply p-3; }
     .staff-menu:not([open]) > nav,.cms-nav:not([open]) > a { display: none; }

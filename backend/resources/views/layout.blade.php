@@ -16,7 +16,7 @@
 <div class="workspace {{ auth()->check() && auth()->user()->isStaff() ? 'workspace--staff' : 'workspace--public' }}">
 @auth @if(auth()->user()->isStaff())
     <aside class="staff-sidebar print:hidden">
-        <div class="staff-user"><span class="staff-avatar" aria-hidden="true">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr(auth()->user()->name,0,1)) }}</span><div><p class="font-semibold text-sm">{{ auth()->user()->name }}</p><p class="text-xs text-emerald-200">{{ ucfirst(auth()->user()->role) }}</p></div></div>
+        <div class="staff-user"><x-profile-avatar :user="auth()->user()" class="staff-avatar" /><div><p class="font-semibold text-sm">{{ auth()->user()->name }}</p><p class="text-xs text-emerald-200">{{ ucfirst(auth()->user()->role) }}</p></div></div>
         <details class="staff-menu" data-staff-menu open><summary>CDRMAPP navigation</summary><nav aria-label="Staff">
             <a href="/dashboard" @if(request()->is('dashboard')) aria-current="page" @endif>Incident dashboard</a>
             <a href="/incident-map" @if(request()->is('incident-map')) aria-current="page" @endif>Map &amp; heatmap</a>

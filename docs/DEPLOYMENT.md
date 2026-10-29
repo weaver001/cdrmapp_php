@@ -40,11 +40,19 @@ Old uploads retain their original `public` disk location; setting `CMS_MEDIA_DIS
 
 If saving an announcement produces no visible result, check the Admin status above the form. It now reports required-field validation, saving, uploading, and upload failures separately. A successful image upload reports **Content and image saved successfully.** The record card shows the saved image or **No image attached.** A timeout does not prove that the server stopped processing: refresh and check the saved image before retrying. If a saved image fails to load, inspect its image request's HTTP status; if no image is attached, inspect the POST request ending in `/image`. Share only status codes and error messages, not credentials, cookies, or signed URLs. The isolated browser regression check is `node infra/cms-media-smoke.cjs`; it intercepts HTTP requests and does not connect to a real bucket.
 
-This configuration covers CMS images only. Profile photos and incident evidence still explicitly use the private **local** disk and need a separate persistent private-storage implementation before relying on their durability in production. Never place evidence in a public bucket.
+CMS images use the configuration above. Profile photos support a private persistent disk as described below. Incident evidence still explicitly uses the private **local** disk and needs a separate persistent private-storage implementation before relying on its durability in production. Never place evidence in a public bucket.
 
 The tests validate disk selection, replacement, failed writes, publication filtering, page/API URLs, and the real S3 adapter's URL signing locally. A live Laravel Cloud bucket is not provisioned or verified by these tests.
 
 Reference: [Laravel Cloud Object Storage](https://cloud.laravel.com/docs/resources/object-storage).
+
+## Laravel Cloud: profile photos and signed-in avatars
+
+Deploy the updated backend and rebuilt web assets with `php artisan migrate --force`. Migration `2026_10_29_000001_add_profile_photo_disk_to_users` adds the nullable disk field that keeps each saved photo tied to its storage location. When the existing Cloud configuration has `CMS_MEDIA_DISK=private`, new profile photos automatically use that same private disk. Otherwise they default to local storage; set `PROFILE_MEDIA_DISK` to an attached private persistent disk for production. This must be a private bucket, with no per-object public ACL or public image URL.
+
+Photos are served only through the authenticated account's `/api/v1/me/photo` endpoint, with private/no-store headers and a new URL version for each successful replacement. The current user's sidebar avatar and profile preview update immediately after upload and display the saved image on later visits. A missing photo falls back to the user's initial. Failed writes retain the previous photo; successful replacements remove the old object from its recorded disk. Existing records without a disk keep using local storage until the user uploads a replacement. Files already lost from an ephemeral deployment cannot be recovered; re-upload them after deploying this revision. No Android rebuild is required.
+
+Validation: `ProfilePhotoTest` covers admin/officer uploads, stored-disk replacement, account isolation, private reads and failed storage/database writes. `node infra/profile-photo-smoke.cjs` uses intercepted requests to check both avatars, reloads, cache-version changes, upload failures/retries and fallback images without connecting to a live bucket.
 
 
 ## Simplified reports and module removal deployment

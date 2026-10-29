@@ -22,7 +22,29 @@ async function upload(path, file) {
     if (!result) throw new Error('Image upload returned an unexpected response. Refresh the page and sign in again if needed.');
     return result;
 }
-document.querySelector('#photo-form')?.addEventListener('submit', async e => { e.preventDefault();const message = document.querySelector('#form-status');try {await upload('/api/v1/me/photo',e.target.elements.image.files[0]);message.textContent='Profile image updated.';}catch(error){message.textContent=error.message;} });
+for (const image of document.querySelectorAll('[data-profile-avatar] [data-avatar-image]')) {
+    image.addEventListener('load', () => { image.hidden = false; });
+    image.addEventListener('error', () => { image.hidden = true; });
+    if (image.getAttribute('src') && image.complete) image.hidden = image.naturalWidth === 0;
+}
+const photoForm = document.querySelector('#photo-form');
+let uploadingPhoto = false;
+photoForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (uploadingPhoto) return;
+    const message = document.querySelector('#form-status');
+    const file = photoForm.elements.image.files[0];
+    if (!file) { message.textContent = 'Select a profile photo first.'; return; }
+    const submit = photoForm.querySelector('button');
+    uploadingPhoto = true; submit.disabled = true; message.textContent = 'Uploading profile photo…';
+    try {
+        const result = await upload('/api/v1/me/photo', file);
+        if (!result.data?.photo_url) throw new Error('Photo upload could not be confirmed. Refresh the page before retrying.');
+        for (const image of document.querySelectorAll('[data-profile-avatar] [data-avatar-image]')) image.src = result.data.photo_url;
+        photoForm.reset(); message.textContent = result.data.message || 'Profile image updated.';
+    } catch (error) { message.textContent = error.message; }
+    finally { uploadingPhoto = false; submit.disabled = false; }
+});
 const node = (tag, text, className) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (className) n.className = className; return n; };
 const button = (text, action) => { const b = node('button', text, 'btn-secondary'); b.type = 'button'; b.addEventListener('click', action); return b; };
 const date = value => new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' }).format(new Date(value));

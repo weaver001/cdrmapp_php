@@ -19,6 +19,10 @@ return [
     // its own explicitly selected disk and must never share a public bucket.
     'cms_disk' => env('CMS_MEDIA_DISK', 'public'),
 
+    // Reuse the application's known private Cloud bucket; never default photos
+    // to the public CMS disk. Existing photos retain their recorded disk.
+    'profile_disk' => env('PROFILE_MEDIA_DISK', env('CMS_MEDIA_DISK') === 'private' ? 'private' : 'local'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

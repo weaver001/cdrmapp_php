@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Content;
 use App\Models\Incident;
 use App\Models\IncidentAttachment;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -50,21 +51,37 @@ class MediaController extends Controller
 
     public function photo(Request $r)
     {
-        $path = $this->image($r)->store('profiles', 'local');
-        $old = $r->user()->profile_photo_path;
-        $r->user()->forceFill(['profile_photo_path' => $path])->save();
+        $disk = config('filesystems.profile_disk');
+        $path = $this->image($r)->store('profiles', $disk);
+        abort_unless($path, 503, 'Profile image storage is unavailable. Please retry.');
+        try {
+            [$user, $old, $oldDisk] = DB::transaction(function () use ($r, $path, $disk) {
+                $user = User::lockForUpdate()->findOrFail($r->user()->id);
+                $old = $user->profile_photo_path;
+                $oldDisk = $user->profile_photo_disk ?: 'local';
+                $user->forceFill(['profile_photo_path' => $path, 'profile_photo_disk' => $disk])->save();
+
+                return [$user, $old, $oldDisk];
+            });
+        } catch (\Throwable $e) {
+            Storage::disk($disk)->delete($path);
+            throw $e;
+        }
+        $r->user()->forceFill(['profile_photo_path' => $path, 'profile_photo_disk' => $disk]);
         if ($old) {
-            Storage::disk('local')->delete($old);
+            rescue(fn () => Storage::disk($oldDisk)->delete($old));
         }
 
-        return ['data' => ['message' => 'Profile image updated.']];
+        return ['data' => ['message' => 'Profile image updated.', 'photo_url' => $user->profile_photo_url]];
     }
 
     public function readPhoto(Request $r)
     {
         abort_unless($r->user()->profile_photo_path, 404);
+        $disk = Storage::disk($r->user()->profile_photo_disk ?: 'local');
+        abort_unless($disk->exists($r->user()->profile_photo_path), 404);
 
-        return Storage::disk('local')->response($r->user()->profile_photo_path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+        return $disk->response($r->user()->profile_photo_path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
     public function attachment(Request $r, Incident $incident)
