@@ -11,6 +11,10 @@
 <body>
     <main id="report-map-page" data-incident-id="{{ $incident->id }}" data-map-key="{{ config('services.google_maps.web_key') }}">
         <div id="report-map" aria-label="Selected incident location"></div>
+        <aside id="report-details" aria-labelledby="report-details-title" tabindex="0">
+            <h1 id="report-details-title" class="text-xl font-bold">Report details</h1>
+            <div id="report-details-body" class="mt-4">Loading report details…</div>
+        </aside>
         <a class="btn report-map-back" href="{{ url('/dashboard') }}" aria-label="Back to incident dashboard">Back</a>
         <p id="report-map-status" role="status">Loading incident location…</p>
     </main>
