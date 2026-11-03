@@ -13,7 +13,7 @@ class AuditFiltersTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_today_uses_manila_boundaries_and_clear_includes_older_entries(): void
+    public function test_all_history_is_default_and_optional_dates_use_manila_boundaries(): void
     {
         $this->travelTo(now()->setDate(2026, 11, 3)->setTime(5, 0));
         $admin = User::factory()->create(['role' => 'admin']);
@@ -21,9 +21,10 @@ class AuditFiltersTest extends TestCase
         foreach (['2026-11-02 15:59:59', '2026-11-02 16:00:00', '2026-11-03 15:59:59', '2026-11-03 16:00:00'] as $time) {
             AuditLog::create(['actor_id' => $admin->id, 'action' => 'content.updated', 'record_type' => 'content', 'record_id' => 1, 'metadata' => [], 'created_at' => $time]);
         }
-        $this->getJson('/api/v1/management/audit')->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('data.0.created_at', '2026-11-03T15:59:59.000000Z');
+        $this->getJson('/api/v1/management/audit')->assertOk()->assertJsonCount(4, 'data')->assertJsonPath('data.0.created_at', '2026-11-03T16:00:00.000000Z');
+        $this->getJson('/api/v1/management/audit?from=2026-11-03&to=2026-11-03')->assertOk()->assertJsonCount(2, 'data');
         $this->getJson('/api/v1/management/audit?from=&to=')->assertOk()->assertJsonCount(4, 'data');
-        $this->get('/manage/audit')->assertOk()->assertSee('Audit History')->assertDontSee('Manage Audit')->assertSee('id="audit-filters"', false)->assertSee('Clear Filter');
+        $this->get('/manage/audit')->assertOk()->assertSee('Audit History')->assertDontSee('Manage Audit')->assertSee('id="audit-filters"', false)->assertSee('Clear Filter')->assertDontSee('Performed by')->assertDontSee('name="actor_id"', false);
     }
 
     public function test_filters_combine_and_saved_agency_survives_record_removal(): void
@@ -35,7 +36,7 @@ class AuditFiltersTest extends TestCase
         $entry = AuditLog::recordChange($admin, 'user.updated', $officer, [], ['email' => 'historical@example.test', 'agency_id' => $fire->id], 'Historical officer');
         $officer->update(['agency_id' => $police->id]);
         $this->actingAs($admin);
-        $query = http_build_query(['from' => '', 'to' => '', 'actor_id' => $admin->id, 'action' => 'updated', 'module' => 'users', 'agency_id' => $fire->id, 'q' => 'historical@example.test']);
+        $query = http_build_query(['from' => '', 'to' => '', 'action' => 'updated', 'module' => 'users', 'agency_id' => $fire->id, 'q' => 'historical@example.test']);
         $this->getJson('/api/v1/management/audit?'.$query)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $entry->id);
         $this->getJson('/api/v1/management/audit?from=&to=&module=profile')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $entry->id);
         $this->getJson('/api/v1/management/audit?from=&to=&agency_id='.$police->id)->assertOk()->assertJsonCount(0, 'data');
@@ -55,7 +56,7 @@ class AuditFiltersTest extends TestCase
         $this->actingAs($admin);
         $this->getJson('/api/v1/management/audit?action=done')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.metadata.after.status', 'done');
         $this->getJson('/api/v1/management/audit?action=undone')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.metadata.after.status', 'need_action');
-        foreach (['action=invalid', 'module=invalid', 'from=invalid', 'from=2026-11-03&to=2026-11-01', 'actor_id=-1'] as $query) {
+        foreach (['action=invalid', 'module=invalid', 'from=invalid', 'from=2026-11-03&to=2026-11-01'] as $query) {
             $this->getJson('/api/v1/management/audit?'.$query)->assertUnprocessable();
         }
         $this->actingAs(User::factory()->create(['role' => 'officer']));

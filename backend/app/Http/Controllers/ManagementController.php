@@ -198,24 +198,17 @@ class ManagementController extends Controller
         $d = $r->validate([
             'from' => 'nullable|date_format:Y-m-d',
             'to' => ['nullable', 'date_format:Y-m-d', ...($r->filled('from') ? ['after_or_equal:from'] : [])],
-            'actor_id' => 'nullable|integer|min:1',
             'action' => 'nullable|in:created,updated,deleted,done,undone,password_reset',
             'module' => 'nullable|in:users,incidents,agencies,content,profile,messages',
             'agency_id' => ['nullable', 'integer', Rule::exists('agencies', 'id')],
             'q' => 'nullable|string|max:100', 'page' => 'nullable|integer|min:1',
         ]);
-        if (! array_key_exists('from', $r->query()) && ! array_key_exists('to', $r->query())) {
-            $d['from'] = $d['to'] = CarbonImmutable::now('Asia/Manila')->toDateString();
-        }
         $query = AuditLog::with('actor:id,name,email');
         if (! empty($d['from'])) {
             $query->where('created_at', '>=', CarbonImmutable::parse($d['from'], 'Asia/Manila')->startOfDay()->utc());
         }
         if (! empty($d['to'])) {
             $query->where('created_at', '<', CarbonImmutable::parse($d['to'], 'Asia/Manila')->addDay()->startOfDay()->utc());
-        }
-        if (! empty($d['actor_id'])) {
-            $query->where('actor_id', $d['actor_id']);
         }
         $modules = ['users' => ['user'], 'incidents' => ['incident'], 'agencies' => ['agency'], 'content' => ['content', 'public_page'], 'messages' => ['contact_message'], 'profile' => ['user', 'profile']];
         if (! empty($d['module'])) {
