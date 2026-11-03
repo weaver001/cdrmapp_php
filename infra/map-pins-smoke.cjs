@@ -72,7 +72,7 @@ const assert = require('node:assert/strict');
             const role = url.searchParams.get('role') === 'officer' ? 'officer' : 'admin';
             return route.fulfill({ contentType: 'text/html', body: `<meta name="csrf-token" content="synthetic"><style>#incidents tr {height:120px}</style>
                 <div id="dashboard" ${mapView ? 'data-map-key="synthetic"' : ''} data-role="${role}">
-                <form id="filters"><input name="q"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><select name="agency_id"><option value="">All authorized</option><option value="1">Fire Department (BFP)</option><option value="2">Police Department (PNP)</option><option value="3">MDRRMO</option></select><button>Apply filters</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
+                <form id="filters"><input name="q"><select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select><select name="agency_id"><option value="">All authorized</option><option value="1">Fire Department (BFP)</option><option value="2">Police Department (PNP)</option><option value="3">MDRRMO</option></select><button>Apply filters</button><button type="button" id="clear-filters">Clear Filter</button></form><p id="dashboard-status"></p><section id="summary"></section><span id="unread"></span>
                 <span id="page"></span><button id="previous"></button><button id="next"></button>
                 <a id="switch-view" href="${mapView ? '/dashboard' : '/incident-map'}"></a>${role === 'admin' ? '<a id="export"></a><button id="print"></button>' : ''}<button id="refresh"></button>
                 ${mapView ? `
@@ -230,6 +230,12 @@ const assert = require('node:assert/strict');
         assert.equal(await page.locator('[name=status]').inputValue(), 'need_action');
         assert.equal(requestedPages.at(-1), '2');
         assert.equal(new URL(page.url()).hash, '#report-12');
+        await page.getByRole('button', {name:'Clear Filter',exact:true}).click();
+        await page.getByText('Page 1 of 2', {exact:true}).waitFor();
+        assert.equal(await page.locator('[name=status]').inputValue(), '');
+        assert.equal(await page.locator('#incidents tr').count(), 16);
+        assert.equal(new URL(page.url()).search, '');
+        assert.equal(new URL(page.url()).hash, '');
         paginated = false;
         await page.goto('http://cdrmapp.test/dashboard?role=officer');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
@@ -255,6 +261,15 @@ const assert = require('node:assert/strict');
         await page.locator('#complete-report').waitFor({state:'hidden'});
         assert.ok((await page.locator('#detail-body').textContent()).includes('SYNTHETIC map completion notes.'));
         assert.ok((await page.locator('#detail-body').textContent()).includes('Legacy response note'));
+        await page.getByRole('button', {name:'Close',exact:true}).click();
+        await page.locator('#exploratory').check();
+        await page.getByRole('button', {name:'Clear Filter',exact:true}).click();
+        await page.waitForFunction(() => window.__markers.filter(marker => marker.options.map).length === 15);
+        assert.equal(await page.locator('[name=q]').inputValue(), '');
+        assert.equal(await page.locator('#exploratory').isChecked(), false);
+        assert.equal(new URL(page.url()).searchParams.has('focus'), false);
+        assert.equal(new URL(page.url()).searchParams.has('q'), false);
+        assert.equal(await page.locator('#export, #print').count(), 0);
         assert.deepEqual(errors, []);
         console.log('PASS: required completion notes, cancel/failed-save retry, preserved response logs via reference and map pin, no rerouting/log-response forms, agency pins and admin-only exports.');
     } finally {

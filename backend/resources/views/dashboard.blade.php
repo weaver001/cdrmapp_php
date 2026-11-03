@@ -13,7 +13,10 @@
         <label>Agency<select name="agency_id"><option value="">All authorized</option>@foreach($agencies as $agency)<option value="{{ $agency->id }}">{{ $agency->name }}</option>@endforeach</select></label>
         <label>Status<select name="status"><option value="">All statuses</option><option value="need_action">Need action</option><option value="done">Done</option></select></label>
         <label>Search<input name="q" maxlength="100" placeholder="Reference or description"></label>
-        <button class="btn self-end">Apply filters</button>
+        <div class="flex flex-wrap gap-2 self-end">
+            <button type="submit" class="btn">Apply filters</button>
+            <button type="button" id="clear-filters" class="btn-secondary">Clear Filter</button>
+        </div>
     </form>
     <div class="flex flex-wrap gap-3 mb-3 print:hidden">
         <a id="switch-view" class="btn-secondary" href="{{ $mapOnly ? url('/dashboard') : route('incident.map') }}">{{ $mapOnly ? 'View reports' : 'View incident map' }}</a>

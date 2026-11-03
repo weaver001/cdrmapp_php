@@ -89,13 +89,13 @@ if (dashboard) {
     const filters = document.querySelector('#filters'); const message = document.querySelector('#dashboard-status');
     const mapView = !!document.querySelector('#map');
     const initialFilters = new URLSearchParams(window.location.search);
-    const focusId = initialFilters.get('focus');
+    let focusId = initialFilters.get('focus');
     let focused = false;
     for (const field of filters.elements) if (field.name && initialFilters.has(field.name)) field.value = initialFilters.get(field.name);
     const requestedPage = Number(initialFilters.get('page'));
     let page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     let restoredPosition = false;
-    let lastPage = 1, busy = false, map, overlay, HeatmapLayerClass, markers = [], latest = [], mapsPromise;
+    let lastPage = 1, busy = false, reloadPending = false, map, overlay, HeatmapLayerClass, markers = [], latest = [], mapsPromise;
     const params = () => new URLSearchParams([...new FormData(filters)].filter(([, value]) => value));
     const reportMapUrl = id => {
         const returnParams = params();
@@ -200,7 +200,7 @@ if (dashboard) {
         } catch (e) { message.textContent = e.message; }
     }
     async function load() {
-        if (busy) return; busy = true;
+        if (busy) { reloadPending = true; return; } busy = true;
         try {
             const p = params(); p.set('page', page);
             const [summary, incidents, notifications] = await Promise.all([api(`/api/v1/dashboard/summary?${p}`), api(`/api/v1/incidents?${p}`), api('/api/v1/notifications')]);
@@ -253,9 +253,24 @@ if (dashboard) {
                     else if (/^#report-\d+$/.test(window.location.hash)) document.querySelector(window.location.hash)?.scrollIntoView({ block: 'center' });
                 });
             }
-        } catch (e) { message.textContent = `Could not refresh: ${e.message}. Existing information may be stale.`; } finally { busy = false; }
+        } catch (e) { message.textContent = `Could not refresh: ${e.message}. Existing information may be stale.`; }
+        finally {
+            busy = false;
+            if (reloadPending) { reloadPending = false; load(); }
+        }
     }
     filters.addEventListener('submit', e => { e.preventDefault(); page = 1; load(); });
+    document.querySelector('#clear-filters')?.addEventListener('click', () => {
+        filters.reset(); page = 1; focusId = null; focused = false; restoredPosition = true;
+        const url = new URL(window.location.href);
+        for (const field of filters.elements) if (field.name) url.searchParams.delete(field.name);
+        for (const name of ['page', 'scroll', 'focus']) url.searchParams.delete(name);
+        url.hash = '';
+        window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+        const exploratory = document.querySelector('#exploratory');
+        if (exploratory) exploratory.checked = false;
+        load();
+    });
     document.querySelector('#refresh').onclick = load;
     const printButton = document.querySelector('#print');
     if (printButton) printButton.onclick = () => window.print();
