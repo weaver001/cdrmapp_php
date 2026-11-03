@@ -101,6 +101,34 @@ class ReportDashboardTest extends TestCase
         $this->get('/incident-map')->assertForbidden();
     }
 
+    public function test_single_report_map_has_no_dashboard_and_enforces_staff_agency_access(): void
+    {
+        $incident = $this->report('done');
+        $path = '/incidents/'.$incident->id.'/map';
+        $this->get($path)->assertRedirect('/login');
+
+        foreach (['admin', 'officer'] as $role) {
+            $this->actingAs(User::factory()->create(['role' => $role, 'agency_id' => $incident->agency_id]));
+            $this->get($path)->assertOk()
+                ->assertSee('id="report-map"', false)
+                ->assertSee('data-incident-id="'.$incident->id.'"', false)
+                ->assertSee('Back to incident dashboard')
+                ->assertDontSee('staff-sidebar')->assertDontSee('site-header')
+                ->assertDontSee('id="dashboard"', false)->assertDontSee('id="filters"', false)
+                ->assertDontSee('Response watchlist')->assertDontSee('Exploratory');
+        }
+        $this->actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => Agency::where('type', 'PNP')->value('id')]));
+        $this->get($path)->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'officer', 'agency_id' => null]));
+        $this->get($path)->assertForbidden();
+        $this->actingAs($incident->reporter);
+        $this->get($path)->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'active' => false]));
+        $this->get($path)->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'must_change_password' => true]));
+        $this->get($path)->assertRedirect('/change-password');
+    }
+
     public function test_removed_modules_are_unavailable_and_home_shows_announcements(): void
     {
         $infographic = Content::create(['type' => 'infographics', 'title' => 'Legacy infographic', 'body' => 'Old content', 'published' => true]);

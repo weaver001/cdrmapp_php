@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Agency;
 use App\Models\ContactMessage;
 use App\Models\Content;
+use App\Models\Incident;
 use App\Models\IncidentCategory;
 use App\Models\PublicPage;
 use App\Models\User;
@@ -76,6 +77,14 @@ class WebController extends Controller
     public function incidentMap()
     {
         return $this->dashboard(true);
+    }
+
+    public function reportMap(Incident $incident)
+    {
+        Gate::authorize('staff');
+        Gate::authorize('view', $incident);
+
+        return view('report-map', ['incident' => $incident]);
     }
 
     public function manage(string $module)

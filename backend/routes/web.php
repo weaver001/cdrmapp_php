@@ -27,6 +27,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::middleware('password.changed')->group(function () {
             Route::get('/dashboard', [WebController::class, 'dashboard']);
             Route::get('/incident-map', [WebController::class, 'incidentMap'])->name('incident.map');
+            Route::get('/incidents/{incident}/map', [WebController::class, 'reportMap'])->name('incident.report-map');
             Route::get('/manage/{module}', [WebController::class, 'manage']);
             Route::patch('/manage/cms/{type}', [PublicPageController::class, 'update'])->whereIn('type', PublicPage::TYPES)->name('cms.page.update');
             Route::get('/profile', fn () => view('profile'));

@@ -218,7 +218,7 @@ if (dashboard) {
                 location.append(node('p', `Latitude: ${Number(i.latitude).toFixed(6)} · Longitude: ${Number(i.longitude).toFixed(6)}`, 'text-sm'));
                 const status = node('td'); status.append(node('span', reportStatusLabel(i.workflow_status), `status-badge ${i.workflow_status === 'done' ? 'status-done' : 'status-need_action'}`));
                 const mapCell = node('td'), mapLink = node('a', null, 'btn-secondary inline-flex items-center justify-center');
-                mapLink.href = `/incident-map?${new URLSearchParams({ q: i.public_reference, focus: String(i.id) })}`;
+                mapLink.href = `/incidents/${i.id}/map`;
                 mapLink.title = 'View on map'; mapLink.setAttribute('aria-label', `View report ${i.public_reference} on map`);
                 const eye = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) eye.setAttribute(name, value);

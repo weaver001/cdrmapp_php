@@ -30,11 +30,11 @@ const assert = require('node:assert/strict');
                 return route.fulfill({ contentType: 'application/javascript', body: `
                     window.__markers = [];
                     window.google = { maps: {
-                        Map: class { constructor() { window.__map=this; } panTo(position) { this.center=position; } setZoom(zoom) { this.zoom=zoom; } }, Size: class { constructor(width,height) { Object.assign(this,{width,height}); } },
+                        Map: class { constructor(element, options) { window.__map=this; Object.assign(this, options); } panTo(position) { this.center=position; } setZoom(zoom) { this.zoom=zoom; } }, Size: class { constructor(width,height) { Object.assign(this,{width,height}); } },
                         Point: class { constructor(x,y) { Object.assign(this,{x,y}); } },
                         Marker: class { constructor(options) { this.options=options;this.listeners={};window.__markers.push(this); } addListener(name,callback) {this.listeners[name]=callback;} setMap(map) { this.options.map=map; } }
                     }};
-                    window.cdrmMapReady();
+                    (window.cdrmReportMapReady || window.cdrmMapReady)();
                 ` });
             }
             assert.equal(url.hostname, 'cdrmapp.test');
@@ -62,6 +62,7 @@ const assert = require('node:assert/strict');
             if (url.pathname.endsWith('/incidents')) return route.fulfill({ json: { data: reports.filter(report => (!url.searchParams.get('status') || report.workflow_status === url.searchParams.get('status')) && (!url.searchParams.get('q') || report.public_reference === url.searchParams.get('q'))), meta: { last_page: 1 } } });
             if (url.pathname.endsWith('/notifications')) return route.fulfill({ json: { data: [], meta: { total: 0 } } });
             if (url.pathname.endsWith('/heatmap')) return route.fulfill({ json: { data: { points: [], exploratory: false } } });
+            if (/^\/incidents\/\d+\/map$/.test(url.pathname)) return route.fulfill({ contentType: 'text/html', body: `<div id="report-map-page" data-incident-id="${url.pathname.split('/')[2]}" data-map-key="synthetic"><a href="/dashboard" aria-label="Back to incident dashboard">Back</a><div id="report-map"></div><p id="report-map-status"></p></div>` });
             const mapView = url.pathname === '/incident-map';
             const role = url.searchParams.get('role') === 'officer' ? 'officer' : 'admin';
             return route.fulfill({ contentType: 'text/html', body: `<meta name="csrf-token" content="synthetic">
@@ -133,9 +134,8 @@ const assert = require('node:assert/strict');
         assert.equal(await page.locator('#incidents tr').count(), 16);
         const eyeLink = page.getByRole('link', { name: 'View report synthetic-6 on map', exact: true });
         const destination = new URL(await eyeLink.getAttribute('href'), 'http://cdrmapp.test');
-        assert.equal(destination.pathname, '/incident-map');
-        assert.equal(destination.searchParams.get('q'), 'synthetic-6');
-        assert.equal(destination.searchParams.get('focus'), '6');
+        assert.equal(destination.pathname, '/incidents/6/map');
+        assert.equal(destination.search, '');
         assert.equal(await eyeLink.locator('svg[aria-hidden="true"]').count(), 1);
         assert.ok((await page.locator('#incidents tr').first().textContent()).includes('Latitude: 14.806000 · Longitude: 121.039000'));
         await page.getByRole('button', { name: 'Mark as done', exact: true }).first().click();
@@ -170,16 +170,16 @@ const assert = require('node:assert/strict');
         reports[5].workflow_status = 'done';
         await page.locator('#refresh').click();
         await page.getByRole('link', { name: 'View report synthetic-6 on map', exact: true }).click();
-        await page.waitForURL('**/incident-map?**');
-        await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
+        await page.waitForURL('**/incidents/6/map');
+        await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/report-map.js'), 'utf8') });
         await page.waitForFunction(() => window.__markers?.length === 1 && window.__map?.zoom === 16);
         assert.deepEqual(await page.evaluate(() => window.__map.center), { lat: reports[5].latitude, lng: reports[5].longitude });
+        assert.equal(await page.evaluate(() => window.__map.disableDefaultUI), true);
         assert.equal(await page.evaluate(() => window.__markers[0].options.icon.url), '/images/map/police-done.svg');
-        assert.ok((await page.locator('#map-status').textContent()).includes('Viewing report synthetic-6.'));
-        await page.evaluate(() => { window.__map.panTo({lat:14.8,lng:121}); window.__map.setZoom(12); });
-        await page.locator('#refresh').click();
-        await page.waitForFunction(() => window.__markers.filter(m => m.options.map).length === 1 && window.__markers.length === 2);
-        assert.equal(await page.evaluate(() => window.__map.zoom), 12, 'Polling must preserve the user map position.');
+        assert.equal(await page.locator('#dashboard, #summary, #filters, #incidents').count(), 0);
+        assert.equal(await page.locator('#report-map-status').isHidden(), true);
+        await page.getByRole('link', {name:'Back to incident dashboard'}).click();
+        await page.waitForURL('**/dashboard');
         await page.goto('http://cdrmapp.test/dashboard?role=officer');
         await page.addScriptTag({ type: 'module', content: fs.readFileSync(path.join(__dirname, '../backend/resources/js/app.js'), 'utf8') });
         await page.locator('#incidents tr').first().waitFor();
