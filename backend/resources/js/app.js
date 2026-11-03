@@ -303,7 +303,7 @@ if (management) {
         staffPasswordFields();
     }
     const endpoint = content ? `/api/v1/management/content/${module}` : module === 'agencies' ? '/api/v1/agencies' : `/api/v1/management/${module}`;
-    const userFilters = module === 'users' ? document.querySelector('#user-filters') : null;
+    const userFilters = module === 'users' ? document.querySelector('#user-filters') : module === 'audit' ? document.querySelector('#audit-filters') : null;
     if (userFilters) {
         const initial = new URLSearchParams(window.location.search);
         for (const field of userFilters.elements) if (field.name && initial.has(field.name)) field.value = initial.get(field.name);
@@ -313,6 +313,12 @@ if (management) {
             load();
         });
     }
+    document.querySelector('#clear-audit-filters')?.addEventListener('click', () => {
+        for (const field of userFilters.elements) if (field.name) field.value = '';
+        page = 1;
+        window.history.replaceState(null, '', `${window.location.pathname}?${new URLSearchParams(new FormData(userFilters))}`);
+        load();
+    });
     const resetDialog = document.querySelector('#staff-reset-confirm');
     let resetting = false, resetTarget = null;
     function confirmStaffReset(item) {
@@ -362,12 +368,13 @@ if (management) {
         const sequence = ++loadSequence;
         try {
             const query = new URLSearchParams({page:String(page),trash:document.querySelector('#trash')?.checked ? '1' : '0'});
-            if (userFilters) for (const [key, value] of new FormData(userFilters)) if (value) query.set(key, value);
+            if (userFilters) for (const [key, value] of new FormData(userFilters)) if (value || module === 'audit') query.set(key, value);
             const result = await api(`${endpoint}?${query}`);
             if (sequence !== loadSequence) return;
             last = result.meta?.last_page || result.last_page || 1;
             if (page > last) { page = last; return load(); }
             const list = document.querySelector('#records'); list.replaceChildren();
+            if (module === 'audit' && !result.data.length) list.append(node('p', 'No audit entries match these filters.', 'panel'));
             for (const item of result.data) {
                 const card = node('article', null, 'panel'); card.append(node('h2', module === 'audit' ? (auditActions[item.action] || statusLabel(item.action)) : item.title || item.name || item.action, 'font-semibold text-lg'));
                 if (module === 'audit') {

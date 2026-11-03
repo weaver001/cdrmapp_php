@@ -19,8 +19,21 @@
     </details>
 @endif
 <div id="management" data-module="{{ $module }}" data-current-user-id="{{ auth()->id() }}">
-    <h{{ $page ? '2' : '1' }} class="{{ $page ? 'section-heading' : 'text-3xl font-bold mb-4' }}">{{ $page ? 'Content items' : 'Manage '.ucwords(str_replace('-',' ',$module)) }}</h{{ $page ? '2' : '1' }}>
+    <h{{ $page ? '2' : '1' }} class="{{ $page ? 'section-heading' : 'text-3xl font-bold mb-4' }}">{{ $page ? 'Content items' : ($module === 'audit' ? 'Audit History' : 'Manage '.ucwords(str_replace('-',' ',$module))) }}</h{{ $page ? '2' : '1' }}>
     <p id="form-status" class="my-4" role="status"></p>
+    @if($module==='audit')
+        <form id="audit-filters" class="panel grid sm:grid-cols-3 gap-4 mb-5">
+            <label>From (Asia/Manila)<input type="date" name="from" value="{{ now('Asia/Manila')->toDateString() }}"></label>
+            <label>Through (Asia/Manila)<input type="date" name="to" value="{{ now('Asia/Manila')->toDateString() }}"></label>
+            <label>Performed by<select name="actor_id"><option value="">All users</option>@foreach($auditActors as $actor)<option value="{{ $actor->id }}">{{ $actor->name }}</option>@endforeach</select></label>
+            <label>Action<select name="action"><option value="">All actions</option><option value="created">Created</option><option value="updated">Updated</option><option value="deleted">Deleted</option><option value="done">Marked Done</option><option value="undone">Marked undone</option><option value="password_reset">Requested password reset</option></select></label>
+            <label>Module<select name="module"><option value="">All modules</option><option value="users">Users</option><option value="incidents">Incidents</option><option value="agencies">Agencies</option><option value="content">Content management</option><option value="profile">Account/profile</option><option value="messages">Messages</option></select></label>
+            <label>Agency<select name="agency_id"><option value="">All agencies</option>@foreach($agencies as $agency)<option value="{{ $agency->id }}">{{ $agency->name }}</option>@endforeach</select></label>
+            <label class="sm:col-span-2">Search<input name="q" maxlength="100" placeholder="Report reference, email, title or record"></label>
+            <div class="flex flex-wrap gap-2 self-end"><button class="btn">Apply Filters</button><button type="button" id="clear-audit-filters" class="btn-secondary">Clear Filter</button></div>
+        </form>
+        <p class="text-sm mb-4">Newest activity first. Starts with today's activity in Asia/Manila. Clear Filter shows all dates. Agency refers to the affected record; older entries may use its current agency.</p>
+    @endif
     @if($module==='users')
         <form id="user-filters" class="panel grid sm:grid-cols-3 gap-4 mb-5">
             <label>Account type<select name="account_type"><option value="all">All accounts</option><option value="officer">All officers</option><option value="admin">Administrator</option><option value="citizen">Citizen</option><option value="fire">Fire Department (BFP)</option><option value="crime">Crime / Police Department (PNP)</option><option value="mdrrmo">MDRRMO</option></select></label>

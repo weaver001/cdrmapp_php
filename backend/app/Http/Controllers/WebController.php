@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agency;
+use App\Models\AuditLog;
 use App\Models\ContactMessage;
 use App\Models\Content;
 use App\Models\Incident;
@@ -95,7 +96,7 @@ class WebController extends Controller
         }
         abort_unless(in_array($module, array_merge(ContentController::TYPES, ['users', 'messages', 'agencies', 'audit']), true), 404);
 
-        return view('manage', ['module' => $module, 'page' => in_array($module, PublicPage::TYPES, true) ? PublicPage::forType($module) : null, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
+        return view('manage', ['title' => $module === 'audit' ? 'Audit History' : null, 'auditActors' => $module === 'audit' ? User::whereIn('id', AuditLog::select('actor_id'))->orderBy('name')->get(['id', 'name']) : collect(), 'module' => $module, 'page' => in_array($module, PublicPage::TYPES, true) ? PublicPage::forType($module) : null, 'agencies' => Agency::inDisplayOrder()->get(), 'categories' => IncidentCategory::inDisplayOrder()->get()]);
     }
 
     public function forgot(Request $r)

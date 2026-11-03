@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Agency;
 use App\Models\AuditLog;
 use App\Models\DeviceToken;
+use App\Models\Incident;
 use App\Models\IncidentCategory;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Auth;
@@ -190,11 +192,68 @@ class ManagementController extends Controller
         return ['data' => ['message' => 'Marked read.']];
     }
 
-    public function audit()
+    public function audit(Request $r)
     {
         Gate::authorize('admin');
+        $d = $r->validate([
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => ['nullable', 'date_format:Y-m-d', ...($r->filled('from') ? ['after_or_equal:from'] : [])],
+            'actor_id' => 'nullable|integer|min:1',
+            'action' => 'nullable|in:created,updated,deleted,done,undone,password_reset',
+            'module' => 'nullable|in:users,incidents,agencies,content,profile,messages',
+            'agency_id' => ['nullable', 'integer', Rule::exists('agencies', 'id')],
+            'q' => 'nullable|string|max:100', 'page' => 'nullable|integer|min:1',
+        ]);
+        if (! array_key_exists('from', $r->query()) && ! array_key_exists('to', $r->query())) {
+            $d['from'] = $d['to'] = CarbonImmutable::now('Asia/Manila')->toDateString();
+        }
+        $query = AuditLog::with('actor:id,name,email');
+        if (! empty($d['from'])) {
+            $query->where('created_at', '>=', CarbonImmutable::parse($d['from'], 'Asia/Manila')->startOfDay()->utc());
+        }
+        if (! empty($d['to'])) {
+            $query->where('created_at', '<', CarbonImmutable::parse($d['to'], 'Asia/Manila')->addDay()->startOfDay()->utc());
+        }
+        if (! empty($d['actor_id'])) {
+            $query->where('actor_id', $d['actor_id']);
+        }
+        $modules = ['users' => ['user'], 'incidents' => ['incident'], 'agencies' => ['agency'], 'content' => ['content', 'public_page'], 'messages' => ['contact_message'], 'profile' => ['user', 'profile']];
+        if (! empty($d['module'])) {
+            $query->whereIn('record_type', $modules[$d['module']]);
+        }
+        if (! empty($d['action'])) {
+            match ($d['action']) {
+                'created' => $query->whereIn('action', ['user.created', 'content.created', 'incident.created', 'incident.test_created']),
+                'updated' => $query->whereIn('action', ['user.updated', 'user.saved', 'content.updated', 'content.saved', 'content.image_updated', 'page.updated', 'agency.updated', 'incident.assignment', 'incident.verified', 'message.restore']),
+                'deleted' => $query->whereIn('action', ['content.deleted', 'message.trash', 'message.destroy']),
+                'password_reset' => $query->where('action', 'user.password_reset_requested'),
+                'done', 'undone' => $query->where('action', 'incident.status')->where('metadata->after->status', $d['action'] === 'done' ? 'done' : 'need_action'),
+            };
+        }
+        if (! empty($d['agency_id'])) {
+            $id = (int) $d['agency_id'];
+            $query->where(function ($q) use ($id) {
+                $q->whereJsonContains('metadata->agency_ids', $id)
+                    ->orWhere('metadata->before->agency_id', $id)->orWhere('metadata->after->agency_id', $id)
+                    ->orWhere(function ($legacy) use ($id) {
+                        $legacy->whereNull('metadata->agency_ids')->where(function ($records) use ($id) {
+                            $records->where(fn ($q) => $q->where('record_type', 'agency')->where('record_id', $id))
+                                ->orWhere(fn ($q) => $q->where('record_type', 'incident')->whereIn('record_id', Incident::where('agency_id', $id)->select('id')))
+                                ->orWhere(fn ($q) => $q->where('record_type', 'user')->whereIn('record_id', User::where('agency_id', $id)->select('id')));
+                        });
+                    });
+            });
+        }
+        if (! empty($d['q'])) {
+            $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $d['q']).'%';
+            $query->where(function ($q) use ($term) {
+                foreach (['action', 'record_type', 'record_id', 'metadata->record->label', 'metadata->actor->name', 'metadata->actor->email', 'metadata->before->email', 'metadata->after->email', 'metadata->before->title', 'metadata->after->title'] as $column) {
+                    $q->orWhereRaw(DB::connection()->getQueryGrammar()->wrap($column)." LIKE ? ESCAPE '!'", [$term]);
+                }
+            });
+        }
 
-        return JsonResource::collection(AuditLog::with('actor:id,name,email')->latest('id')->paginate(50));
+        return JsonResource::collection($query->orderByDesc('created_at')->orderByDesc('id')->paginate(50)->withQueryString());
     }
 
     private function userSnapshot(User $user): array

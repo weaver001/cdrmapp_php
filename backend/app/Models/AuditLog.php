@@ -37,6 +37,10 @@ class AuditLog extends Model
             'actor_id' => $actor->id, 'action' => $action,
             'record_type' => Str::snake(class_basename($record)), 'record_id' => $record->getKey(),
             'metadata' => [
+                'agency_ids' => array_values(array_unique(array_map('intval', array_filter([
+                    $before['agency_id'] ?? null, $after['agency_id'] ?? null,
+                    $record instanceof Agency ? $record->getKey() : $record->getAttribute('agency_id'),
+                ])))),
                 'actor' => ['name' => $actor->name, 'email' => $actor->email],
                 'record' => ['label' => $label ?? $record->getAttribute('title') ?? $record->getAttribute('name') ?? class_basename($record).' #'.$record->getKey()],
                 'before' => $before, 'after' => $after,
