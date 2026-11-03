@@ -92,8 +92,18 @@ if (dashboard) {
     const focusId = initialFilters.get('focus');
     let focused = false;
     for (const field of filters.elements) if (field.name && initialFilters.has(field.name)) field.value = initialFilters.get(field.name);
-    let page = 1, lastPage = 1, busy = false, map, overlay, HeatmapLayerClass, markers = [], latest = [], mapsPromise;
+    const requestedPage = Number(initialFilters.get('page'));
+    let page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    let restoredPosition = false;
+    let lastPage = 1, busy = false, map, overlay, HeatmapLayerClass, markers = [], latest = [], mapsPromise;
     const params = () => new URLSearchParams([...new FormData(filters)].filter(([, value]) => value));
+    const reportMapUrl = id => {
+        const returnParams = params();
+        returnParams.set('page', page);
+        returnParams.set('scroll', Math.round(window.scrollY));
+        const returnTo = `/dashboard?${returnParams}#report-${id}`;
+        return `/incidents/${id}/map?${new URLSearchParams({ return_to: returnTo })}`;
+    };
     async function ensureMap() {
         if (!mapView) return false;
         if (!dashboard.dataset.mapKey) { document.querySelector('#map-status').textContent = 'Google Maps is not configured. Set GOOGLE_MAPS_WEB_KEY with a restricted web API key.'; return; }
@@ -212,13 +222,16 @@ if (dashboard) {
             const rows = document.querySelector('#incidents'); rows?.replaceChildren(); latest = incidents.data;
             if (rows && !latest.length) { const tr = node('tr'); const td = node('td', 'No reports match these filters.'); td.colSpan = 7; tr.append(td); rows.append(tr); }
             if (rows) for (const i of latest) {
-                const tr = node('tr'); const ref = node('td'); ref.append(button(i.public_reference.slice(0, 8), () => detail(i.id)), node('p', date(i.received_at), 'text-xs mt-2'));
+                const tr = node('tr'); tr.id = `report-${i.id}`;
+                const ref = node('td'); ref.append(button(i.public_reference.slice(0, 8), () => detail(i.id)), node('p', date(i.received_at), 'text-xs mt-2'));
                 const actions = node('td'); actions.append(button(i.workflow_status === 'done' ? 'Mark as undone' : 'Mark as done', () => action(i.id, i.workflow_status === 'done' ? 'need_action' : 'done')));
                 const location = node('td'); if (i.address) location.append(node('p', i.address));
                 location.append(node('p', `Latitude: ${Number(i.latitude).toFixed(6)} · Longitude: ${Number(i.longitude).toFixed(6)}`, 'text-sm'));
                 const status = node('td'); status.append(node('span', reportStatusLabel(i.workflow_status), `status-badge ${i.workflow_status === 'done' ? 'status-done' : 'status-need_action'}`));
                 const mapCell = node('td'), mapLink = node('a', null, 'btn-secondary inline-flex items-center justify-center');
-                mapLink.href = `/incidents/${i.id}/map`;
+                mapLink.href = reportMapUrl(i.id);
+                mapLink.addEventListener('click', () => { mapLink.href = reportMapUrl(i.id); });
+                mapLink.addEventListener('auxclick', () => { mapLink.href = reportMapUrl(i.id); });
                 mapLink.title = 'View on map'; mapLink.setAttribute('aria-label', `View report ${i.public_reference} on map`);
                 const eye = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) eye.setAttribute(name, value);
@@ -232,6 +245,14 @@ if (dashboard) {
             if (switchView) switchView.href = `${new URL(switchView.href).pathname}?${params()}`;
             message.textContent = `Updated ${date(new Date())}. Refreshes every 15 seconds while visible.`;
             await updateMap();
+            if (!mapView && !restoredPosition) {
+                restoredPosition = true;
+                requestAnimationFrame(() => {
+                    const scroll = Number(initialFilters.get('scroll'));
+                    if (initialFilters.has('scroll') && Number.isFinite(scroll) && scroll >= 0) window.scrollTo(0, scroll);
+                    else if (/^#report-\d+$/.test(window.location.hash)) document.querySelector(window.location.hash)?.scrollIntoView({ block: 'center' });
+                });
+            }
         } catch (e) { message.textContent = `Could not refresh: ${e.message}. Existing information may be stale.`; } finally { busy = false; }
     }
     filters.addEventListener('submit', e => { e.preventDefault(); page = 1; load(); });

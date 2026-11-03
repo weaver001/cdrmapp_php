@@ -1,6 +1,13 @@
 const page = document.querySelector('#report-map-page');
 const message = document.querySelector('#report-map-status');
 const details = document.querySelector('#report-details-body');
+const backLink = document.querySelector('.report-map-back');
+try {
+    const returnTo = new URL(new URLSearchParams(window.location.search).get('return_to') || '/dashboard', window.location.origin);
+    if (returnTo.origin === window.location.origin && returnTo.pathname === '/dashboard') {
+        backLink.href = `${returnTo.pathname}${returnTo.search}${returnTo.hash}`;
+    }
+} catch { /* Keep the dashboard fallback for an invalid return address. */ }
 const node = (tag, text, className = '') => {
     const element = document.createElement(tag);
     element.textContent = text;
@@ -21,10 +28,8 @@ function renderDetails(incident) {
     details.append(node('p', done ? 'Done' : 'Need action', `status-badge mt-3 ${done ? 'status-done' : 'status-need_action'}`));
     field('Description', incident.description);
     field('Agency', incident.agency?.name || 'Unassigned');
-    field('Category', incident.category?.name || 'Not recorded');
     field('Reporter', incident.reporter?.name || 'Not recorded');
     field('Received (Asia/Manila)', date(incident.received_at));
-    field('Location', incident.address || 'No address supplied');
     field('Coordinates', `${incident.latitude}, ${incident.longitude}`);
     field('Location source', `${incident.location_source || 'Not recorded'} · Accuracy: ${incident.accuracy_m == null ? 'not measured' : `${incident.accuracy_m} m`}`);
     details.append(node('h2', 'Status history', 'font-semibold mt-5'));
